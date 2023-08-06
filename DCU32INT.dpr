@@ -1,10 +1,11 @@
+{$A+,B-,C+,D+,E-,F-,G+,H+,I+,J+,K-,L+,M-,N+,O+,P+,Q-,R-,S-,T-,U-,V+,W-,X+,Y+,Z1}
 {$APPTYPE CONSOLE}
-program DCU32INT;
+program dcu32int;
 (*
 The main module of the DCU32INT utility by Alexei Hmelnov.
 ----------------------------------------------------------------------------
-E-Mail: alex@monster.icc.ru
-http://monster.icc.ru/~alex/DCU/
+E-Mail: alex@icc.ru
+http://hmelnov.icc.ru/DCU/
 ----------------------------------------------------------------------------
 
 See the file "readme.txt" for more details.
@@ -24,17 +25,23 @@ freely, subject to the following restrictions:
 3. This notice may not be removed or altered from any source
    distribution.
 *)
+//  {$IFNDEF LINUX}Windows,{$ELSE}LinuxFix,{$ENDIF}
 
 uses
-  Windows,
   SysUtils,
   DCU32 in 'DCU32.pas',
   DCUTbl in 'DCUTbl.pas',
   DCU_In in 'DCU_In.pas',
   DCU_Out in 'DCU_Out.pas',
-  FixUp in 'FixUp.pas';
+  FixUp in 'FixUp.pas',
+  DCURecs in 'DCURecs.pas',
+  DasmDefs in 'DasmDefs.pas',
+  DasmCF in 'DasmCF.pas',
+  DCP in 'DCP.pas',
+  DasmX86 in 'DasmX86.pas',
+  DasmMSIL in 'DasmMSIL.pas';
 
-{$R *.RES}
+{$R *.res}
 
 procedure WriteUsage;
 begin
@@ -43,23 +50,37 @@ begin
   '  DCU32INT <Source file> <Flags> [<Destination file>]'#13#10+
   'Destination file may contain * to be replaced by unit name or name and extension'#13#10+
   'Destination file = "-" => write to stdout.'#13#10+
+ {$IFNDEF LINUX}
   'Flags (start with "/" or "-"):'#13#10+
+ {$ELSE}
+  'Flags (start with "-"):'#13#10+
+ {$ENDIF}
   ' -S<show flag>* - Show flags (-S - show all), default: (+) - on, (-) - off'#13#10+
-  '    I(+) - show Imported names'#13#10+
-  '    T(-) - show Type table'#13#10+
   '    A(-) - show Address table'#13#10+
+  '    C(-) - don''t resolve Constant values'#13#10+
   '    D(-) - show Data block'#13#10+
-  '    F(-) - show fixups'#13#10+
-  '    V(-) - show auxiliary Values'#13#10+
-  '    M(-) - don''t resolve class methods'#13#10+
-  '    C(-) - don''t resolve constant values'#13#10+
   '    d(-) - show dot types'#13#10+
+  '    F(-) - show Fixups'#13#10+
+  '    I(+) - show Imported names'#13#10+
+  '    L(-) - show table of Local variables'#13#10+
+  '    M(-) - don''t resolve class Methods'#13#10+
+  '    O(-) - show file Offsets'#13#10+
+  '    T(-) - show Type table'#13#10+
+  '    U(-) - show Units of imported names'#13#10+
+  '    V(-) - show auxiliary Values'#13#10+
   '    v(-) - show VMT'#13#10+
+  ' -O<option>* - code generation options, default: (+) - on, (-) - off'#13#10+
+  '    V(-) - typed constants as variables'#13#10+
   ' -I - interface part only'#13#10+
-  ' -U<paths> = Unit directories'#13#10+
-  ' -N<Prefix> = No Name Prefix ("%" - Scope char)'#13#10+
-  ' -D<Prefix> = Dot Name Prefix ("%" - Scope char)'#13#10+
-  ''#13#10
+  ' -U<paths> - Unit directories'#13#10+
+  ' -P<paths> - Pascal source directories (just "-P" means: "seek for *.pas in'#13#10+
+  '    the unit directory"). Without this parameter src lines won''t be reported'#13#10+
+  ' -R<Alias>=<unit>[;<Alias>=<unit>]* - set unit aliases'#13#10+
+  ' -N<Prefix> - No Name Prefix ("%" - Scope char)'#13#10+
+  ' -D<Prefix> - Dot Name Prefix ("%" - Scope char)'#13#10+
+  ' -A<Mode> - disAssembler mode'#13#10+
+  '    S(+) - simple Sequential (all memory is a sequence of ops)'#13#10+
+  '    C(-) - control flow'#13#10
   );
 end ;
 
@@ -76,9 +97,13 @@ begin
   Result := false;
   for i:=1 to ParamCount do begin
     PS := ParamStr(i);
-    if (Length(PS)>1)and((PS[1]='/')or(PS[1]='-')) then begin
+    if (Length(PS)>1)and({$IFNDEF LINUX}(PS[1]='/')or{$ENDIF}(PS[1]='-')) then begin
       Ch := UpCase(PS[2]);
       case Ch of
+        'H','?': begin
+          WriteUsage;
+          Exit;
+         end ;
         'S': begin
           if Length(PS)=2 then
             SetShowAll
@@ -86,15 +111,18 @@ begin
             for j:=3 to Length(PS) do begin
               Ch := {UpCase(}PS[j]{)};
               case Ch of
+                'A': ShowAddrTbl := true;
+                'C': ResolveConsts := false;
+                'D': ShowDataBlock := true;
+                'd': ShowDotTypes := true;
+                'F': ShowFixupTbl := true;
                 'I': ShowImpNames := false;
                 'T': ShowTypeTbl := true;
-                'A': ShowAddrTbl := true;
-                'D': ShowDataBlock := true;
-                'F': ShowFixupTbl := true;
-                'V': ShowAuxValues := true;
+                'L': ShowLocVarTbl := true;
                 'M': ResolveMethods := false;
-                'C': ResolveConsts := false;
-                'd': ShowDotTypes := true;
+                'O': ShowFileOffsets := true;
+                'U': ShowImpNamesUnits := true;
+                'V': ShowAuxValues := true;
                 'v': ShowVMT := true;
               else
                 Writeln('Unknown show flag: "',Ch,'"');
@@ -103,10 +131,28 @@ begin
             end ;
           end ;
         end ;
+        'O':
+          for j:=3 to Length(PS) do begin
+            Ch := {UpCase(}PS[j]{)};
+            case Ch of
+              'V': GenVarCAsVars := true;
+            else
+              Writeln('Unknown code generation option: "',Ch,'"');
+              Exit;
+            end ;
+          end ;
         'I': InterfaceOnly := true;
         'U': begin
           Delete(PS,1,2);
           DCUPath := PS;
+        end ;
+        'R': begin
+          Delete(PS,1,2);
+          SetUnitAliases(PS);
+        end ;
+        'P': begin
+          Delete(PS,1,2);
+          PASPath := PS;
         end ;
         'N': begin
           Delete(PS,1,2);
@@ -115,6 +161,19 @@ begin
         'D': begin
           Delete(PS,1,2);
           DotNamePrefix := PS;
+        end ;
+        'A': begin
+           if Length(PS)=2 then
+             Ch := 'C'
+           else
+             Ch := UpCase(PS[3]);
+           case Ch of
+            'S': DasmMode := dasmSeq;
+            'C': DasmMode := dasmCtlFlow;
+           else
+             Writeln('Unknown disassembler mode: "',Ch,'"');
+             Exit;
+           end ;
         end ;
       else
         Writeln('Unknown flag: "',Ch,'"');
@@ -154,33 +213,47 @@ end ;
 function ProcessFile(FN: String): integer {ErrorLevel};
 var
   U: TUnit;
-  ExcS: String;
-  SaveOut: Text;
+  NS,ExcS: String;
   OutRedir: boolean;
+  CP: PChar;
 begin
   Result := 0;
   OutRedir := false;
-  if FNRes<>'-' then begin
+  if FNRes='-' then
+    FNRes := ''
+  else begin
     Writeln{(StdErr)};
     Writeln('File: "',FN,'"');
+    NS := ExtractFileName(FN);
+    CP := StrScan(PChar(NS),PkgSep);
+    if CP<>Nil then
+      NS := StrPas(CP+1);
     if FNRes='' then
-      FNRes := ChangeFileExt(FN,'.int')
+      FNRes := ExtractFilePath(FN)+ChangeFileExt(NS,'.int')
     else
       FNRes := ReplaceStar(FNRes,FN);
     Writeln('Result: "',FNRes,'"');
 //    CloseFile(Output);
     Flush(Output);
-    TTextRec(SaveOut) := TTextRec(Output);
-    AssignFile(Output,FNRes);
     OutRedir := true;
   end ;
+  AssignFile(FRes,FNRes);
+  TTextRec(FRes).Mode := fmClosed;
   try
     try
-      Rewrite(Output); //Test whether the FNRes is a correct file name
+      Rewrite(FRes); //Test whether the FNRes is a correct file name
       try
         InitOut;
-        U := GetDCUByName(FN,0,0){TUnit.Create(FN)};
-        U.Show;
+        FN := ExpandFileName(FN);
+        U := Nil;
+        try
+          U := GetDCUByName(FN,'',0,false,0){TUnit.Create(FN)};
+        finally
+          if U=Nil then
+            U := MainUnit;
+          if U<>Nil then
+            U.Show;
+        end ;
       finally
         FreeDCU;
       end ;
@@ -188,26 +261,28 @@ begin
       on E: Exception do begin
         Result := 1;
         ExcS := Format('%s: "%s"',[E.ClassName,E.Message]);
-        if TTextRec(Output).Mode<>fmClosed then begin
-          Writeln;
-          Writeln(ExcS);
-          Flush(Output);
+        if TTextRec(FRes).Mode<>fmClosed then begin
+          Writeln(FRes);
+          Writeln(FRes,ExcS);
+          Flush(FRes);
         end ;
         if OutRedir then
-          Writeln(SaveOut,ExcS);
+          Writeln(ExcS);
       end ;
     end ;
   finally
-    if OutRedir then
-      Close(SaveOut);
-    if TTextRec(Output).Mode<>fmClosed then
+    if TTextRec(FRes).Mode<>fmClosed then
+      Close(FRes);
+    if OutRedir then begin
+      Writeln(Format('Total %d lines generated.',[OutLineNum]));
       Close(Output);
+    end ;
   end ;
 end ;
 
 begin
   if not ProcessParms then begin
-    WriteUsage;
+    Writeln('Call this program with -? or -h parameters for help on usage.');//WriteUsage;
     Exit;
   end ;
   Halt(ProcessFile(DCUName));

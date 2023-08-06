@@ -1,33 +1,98 @@
 The DCU32INT utility by Alexei Hmelnov.
-Version 1.6 beta
+Version 1.10.0
 
 ----------------------------------------------------------------------------
-E-Mail: alex@monster.icc.ru
-http://monster.icc.ru/~alex/DCU/
+E-Mail: alex@icc.ru
+http://hmelnov.icc.ru/DCU/
 ----------------------------------------------------------------------------
 
 Purpose.
 --------
 
-Parse Delphi 2.0-6.0 and Kylix 1.0 units (DCU) and convert their information
-into the close to Pascal form.
+Parse Delphi 2.0-8.0, 2005(.net and WIN32), 2006(WIN32 only), Kylix 1.0-3.0
+units (DCU) and convert their information into the close to Pascal form.
 
 DCU32INT stands for DCU32 INTerface, because this program can't extract 
 the complete Pascal source, but the extracted unit interface is almost 
 correct (see Compiler Information Loss Limitations section for exceptions).
 
 This program is a by-product of the FlexT project (see 
-http://monster.icc.ru/~alex/FlexT/ for details), but 
+http://hmelnov.icc.ru/FlexT/ for details), but 
 I have done my best to make it useful.
 
 Changes from the version 1.0.
--------------------------
+-----------------------------
+
+Version 1.10.0:
+
+1. Units of Delphi 2006 (WIN32) were parsed successfully.
+
+Version 1.9.0:
+
+1. Units of Delphi 2005 (WIN32, .net) were parsed successfully.
+
+Version 1.8.0:
+
+1. The generic disassembler was implemented. It is now possible to 
+  register a new disassemblers using the call
+
+  SetDisassembler(ReadCommand, ShowCommand,CheckCommandRefs)
+
+2. The MSIL (MicroSoft Intermediate Layer) disassembler for .net code
+  was implemented.
+
+3. Units of Delphi 8.0 were parsed successfully.
+
+Version 1.7.4:
+
+1. Some control flow analysis was implemented for disassembler
+  (the -AC program option).
+
+Version 1.7.3:
+
+1. Units of Delphi 7.0 were parsed successfully.
+
+Version 1.7.2:
+
+1. Units of open Kylix 3.0 were parsed successfully.
+
+Version 1.7.1:
+
+1. Units of open Kylix 3.0 were parsed successfully.
+
+Version 1.7.0:
+
+1. Some units of trial Delphi 7.0 were parsed successfully.
+
+Version 1.6.4:
+
+1. A problem was fixed with resourcestring sections inside procedures.
+
+Version 1.6.3:
+
+1. Some tricky Kylix header fields prevented from processing some files.
+  This problem was fixed, but only for the examples of Kylix DCUs,
+  which I have. Please, send me DCUs, which still can't be parsed.
+
+Version 1.6.2:
+
+1. Kylix 2.0 units are supported. In fact, only the file signature
+  change was detected.
+
+Version 1.6.1:
+
+1. The DCU32INT sources can now be compiled under Kylix.
+2. User units compiled under Kylix have another header structure,
+  than that of Kylix LIB units, on which DCU32INT was originally
+  tested. The program was fixed to take it into account.
+
+Version 1.6.:
 
 1. Delphi 6.0 and Kylix 1.0 units are supported now.
   Note, this feature is new and it was tested almost only on the
   .\LIB\*.dcu files (see Validity), so bug reports are welcome
   with the units, which were not parsed correctly, applied.
-  Please send them to alex@monster.icc.ru.
+  Please send them to alex@icc.ru.
 2. When analyzing Delphi 6 and Kylix DCU format, the data types
   of some fields were clarified. In particular, some byte fields
   become indices, because additional bits of their values were used.
@@ -50,22 +115,34 @@ extension. If * is the last char in the name, it will be replaced by
 <Unit name>.int, else - by <Unit name>.
 Destination file = "-" => write to stdout.
 
-Switches (start with "/" or "-"):
  -S<show flag>* - Show flags (-S - show all), default: (+) - on, (-) - off
-    I(+) - show Imported names
-    T(-) - show Type table
     A(-) - show Address table
+    C(-) - don't resolve Constant values
     D(-) - show Data block
-    F(-) - show fixups
-    V(-) - show auxiliary Values
-    M(-) - don't resolve class methods
-    C(-) - don't resolve constant values
     d(-) - show dot types
-    v(-) - show VMT for objects and classes
+    F(-) - show Fixups
+    I(+) - show Imported names
+    L(-) - show table of Local variables
+    M(-) - don't resolve class Methods
+    O(-) - show file Offsets
+    T(-) - show Type table
+    U(-) - show Units of imported names
+    V(-) - show auxiliary Values
+    v(-) - show VMT
+ -O<option>* - code generation options, default: (+) - on, (-) - off
+    V(-) - typed constants as variables
  -I - interface part only
- -U<paths> = Unit directories
- -N<Prefix> = No Name Prefix ("%" - Scope char)
- -D<Prefix> = Dot Name Prefix ("%" - Scope char)
+ -U<paths> - Unit directories
+ -P<paths> - Pascal source directories (just "-P" means: "seek for *.pas in
+    the unit directory"). Without this parameter src lines won't be reported
+ -R<Alias>=<unit>[;<Alias>=<unit>]* - set unit aliases
+ -N<Prefix> - No Name Prefix ("%" - Scope char)
+ -D<Prefix> - Dot Name Prefix ("%" - Scope char)
+ -A<Mode> - disAssembler mode
+    S(+) - simple Sequential (all memory is a sequence of ops)
+    C(-) - control flow
+
+Call the program with -? or -h parameters for help on usage.
 
 The Scope char symbol will be replaced in the name by "T" for types "C" for
 constants and so on (see source for details).
@@ -81,18 +158,20 @@ In general, there are two main ways to run the program:
 Of course, You can always select only a subset of additional information using 
 the -S<flags>.
 
+
 Validity.
 ---------
 
 The DCU32INT utility have passed successfully the "parse all .\LIB" test 
-for all the supported by it Delphi versions, i.e. it have parsed all units 
-in the <DELPHI LOCATION>\LIB directory with no errors reported. 
+for all the supported by it Delphi and Kylix versions, i.e. it have parsed 
+all units in the <DELPHI LOCATION>\LIB directory with no errors reported. 
 See alllib<N>.bat files for examples of running the DCU32INT to parse
 all .\LIB.
 
 This success doesn't mean, however, that the underlying DCU specification is 
 absolutely correct. So, please, send me your bug reports (see the section 
 "Home page" for details).
+
 
 History.
 --------
@@ -197,6 +276,7 @@ the DCU32INT program, but the FlexT parse results were still used when
 something went wrong. The most complex thing here was to understand the
 rules of assignment of the numbers in the sequence of addresses.
 
+
 The Compiler Information Loss Limitations.
 ------------------------------------------
 
@@ -248,10 +328,22 @@ Examples:
   end;
 
   where Ofs:_ is a field offset information. Of course, we can group
-  the fields into cases according to their order and offsets (future work),
-  but the information about case labels is lost here completely, and it can't
-  be used, e.g. to display safely (Delphi version independent) the Variant
-  type value using the TVarRec definition.
+  the fields into cases according to their order and offsets (this
+  capability is now supported by DCU32INT), and TVarRec is parsed as
+
+  TVarRec=record 
+    case Integer of
+     0: (
+       VInteger: Integer;
+       VType: Byte);
+     1: (
+       VBoolean: Boolean);
+    ----------------------------------
+  end;
+
+  But the information about the case labels is lost here completely, 
+  and it can't be used, e.g. to display safely (Delphi version 
+  independent) the Variant type value using the TVarData definition.
 
 All the above mentioned limitations can be demonstrated by Delphi
 browser and evaluator (those utilities are also limited by them).
@@ -263,13 +355,14 @@ Home page.
 ----------
 
 The latest version of this program and all the related news will be available
-at http://monster.icc.ru/~alex/DCU/
+at http://hmelnov.icc.ru/DCU/
 
-Please, send me (e-mail: alex@monster.icc.ru) bug reports (including the units 
+Please, send me (e-mail: alex@icc.ru) bug reports (including the units 
 which were not parsed correctly), but first check:
   1. that you have the latest version of DCU32INT,
   2. that this bug was not already reported at 
-     http://monster.icc.ru/~alex/DCU/FAQ.htm (projected page name).
+     http://hmelnov.icc.ru/DCU/FAQ.htm.
+
 
 Collaboration.
 --------------
@@ -286,8 +379,8 @@ develop myself in the nearest future:
 1. The DCU32INT is a console application, but it would be interesting to 
   create some kind of DCU Browser as a GUI application.
 
-2. The disassembler, which is used in DCU32INT, is VERY simple, it would be 
-  useful to improve it. 
+2. The disassembler, which is used in DCU32INT, is rather simple, it would be 
+  useful to improve it using some data flow analysis techniques.
 
 3. The ideal final result for this kind of program would be to restore 
   completely the Pascal source from DCU. Of course this problem 
@@ -295,7 +388,8 @@ develop myself in the nearest future:
   the Pascal source, where all the procedures are ASSEMBLER. The easier 
   approach is to produce assembler procedures which could have incorrect
   semantics (e.g. DB instead of some opcodes), but still could be compiled 
-  to produce correct executable. 
+  to produce correct executable. Note, that the result of this kind of 
+  program would be Delphi version dependent.
 
 4. Compiler discards some names, and other information. We could create
   additional input file for DCU32INT, which could contain some additional 
@@ -307,7 +401,8 @@ develop myself in the nearest future:
 5. Personally, I prefer to use Delphi and not C++ Builder, but it could be 
   interesting to modify this program to enable it generate its output in 
   the close to C++ Builder syntax form (C++ syntax + Borland's extensions) 
-  instead of Pascal. 
+  instead of Pascal. This program could be used to partially transfer
+  programs frop Pascal to C through DCU.
   
 ------------------------------------------------------------------------
 

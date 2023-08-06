@@ -5,8 +5,8 @@ interface
 The output module of the DCU32INT utility by Alexei Hmelnov.
 (Pay attention on the SoftNL technique for pretty-printing.)
 ----------------------------------------------------------------------------
-E-Mail: alex@monster.icc.ru
-http://monster.icc.ru/~alex/DCU/
+E-Mail: alex@icc.ru
+http://hmelnov.icc.ru/DCU/
 ----------------------------------------------------------------------------
 
 See the file "readme.txt" for more details.
@@ -29,22 +29,34 @@ freely, subject to the following restrictions:
 uses
   SysUtils, FixUp;
 
+type
+  TDasmMode = (dasmSeq,dasmCtlFlow);
+
 { Options: }
-const
+var
   InterfaceOnly: boolean=false;
   ShowImpNames: boolean=true;
   ShowTypeTbl: boolean=false;
   ShowAddrTbl: boolean=false;
   ShowDataBlock: boolean=false;
   ShowFixupTbl: boolean=false;
+  ShowLocVarTbl: boolean=false;
+  ShowFileOffsets: boolean=false;
   ShowAuxValues: boolean=false;
   ResolveMethods: boolean=true;
   ResolveConsts: boolean=true;
   ShowDotTypes: boolean=false;
   ShowVMT: boolean=false;
+  ShowImpNamesUnits: boolean=false;
+  DasmMode: TDasmMode = dasmSeq;
+
+var
   AuxLevel: integer=0;
 
-const
+var
+  GenVarCAsVars: boolean = false;
+
+var
   NoNamePrefix: String = '_N%_';
   DotNamePrefix: String = '_D%_';
 
@@ -58,6 +70,7 @@ procedure InitOut;
 procedure FlushOut;
 
 function CharDumpStr(var V;N : integer): ShortString;
+function DumpStr(var V;N : integer): String;
 
 function IntLStr(DP: Pointer; Sz: Cardinal; Neg: boolean): String;
 
@@ -73,8 +86,10 @@ const
 
 var
   NLOfs: cardinal;
+  OutLineNum: integer = 0 {Read only};
+  FRes: TextFile;
 
-procedure ShowDump(DP: PChar; SizeDispl,Size: Cardinal;
+procedure ShowDump(DP,DPFile0: PChar; FileSize,SizeDispl,Size: Cardinal;
   Ofs0Displ,Ofs0,WMin: Cardinal; FixCnt: integer; FixTbl: PFixupTbl;
   FixUpNames: boolean);
 
@@ -90,11 +105,14 @@ begin
   ShowAddrTbl := true;
   ShowDataBlock := true;
   ShowFixupTbl := true;
+  ShowLocVarTbl := true;
+  ShowFileOffsets := true;
   ShowAuxValues := true;
   ResolveMethods := true;
   ResolveConsts := true;
   ShowDotTypes := true;
   ShowVMT := true;
+  ShowImpNamesUnits := true;
 end ;
 
 var
@@ -114,7 +132,7 @@ begin
     W := MaxNLOfs;
   S[0] := Chr(W);
   FillChar(S[1],W,' ');
-  Write(S);
+  Write(FRes,S);
 end ;
 
 function GetSoftNLOfs(var ResNLOfs: Cardinal): integer;
@@ -149,13 +167,14 @@ begin
        Buf[i] := ' ';
     FillNL(BufNLOfs);
 //    SetString(S,Buf,W);
-//    Write(S);
+//    Write(FRes,S);
     SaveCh := Buf[W];
     Buf[W] := #0;
-    Write(Buf);
+    Write(FRes,Buf);
     Buf[W] := SaveCh;
   end ;
-  Writeln;
+  Writeln(FRes);
+  Inc(OutLineNum);
   while (W<BufLen)and(Buf[W]<=' ') do
     Inc(W);
   if W<BufLen then
@@ -212,8 +231,8 @@ begin
    end
   else begin
     FillNL(BufNLOfs);
-    Write(S);
-    Writeln;
+    Write(FRes,S);
+    Writeln(FRes);
   end ;}
 end ;
 
@@ -260,6 +279,7 @@ begin
   NLOfs := 0;
   BufLen := 0;
   BufNLOfs := NLOfs;
+  OutLineNum := 0;
 end ;
 
 function CharDumpStr(var V;N : integer): ShortString;
@@ -301,13 +321,13 @@ begin
   ByteChars := Word(Ch);
 end ;
 
-function DumpStr(var V;N : integer): ShortString;
+function DumpStr(var V;N : integer): String;
 var
   i : integer ;
   BP: ^Byte;
   P: Pointer;
 begin
-  Result[0] := Chr(N*3-1);
+  SetLength(Result,N*3-1);
   P := @Result[1];
   BP := @V;
   for i := 1 to N do begin
@@ -317,25 +337,50 @@ begin
     Inc(Cardinal(P));
     Inc(Cardinal(BP));
   end ;
+  Dec(Cardinal(P));
+  Char(P^) := #0;
 end ;
 
-procedure ShowDump(DP: PChar; {Dump address}
-  SizeDispl {used to calculate display offset digits},
+const
+  OfsFmtS='%0.0x: %2:s';
+  FileOfsFmtS='%0.0x_%0.0x: %s';
+
+function GetNumHexDigits(Sz: Cardinal): Cardinal;
+begin
+  Result := 0;
+  while Sz>0 do begin
+    Inc(Result);
+    Sz := Sz shr 4;
+  end ;
+end ;
+
+procedure SetHexFmtNumDigits(var FmtS: String; p: integer; Sz: Cardinal);
+var
+  N: Cardinal;
+  LCh: Char;
+begin
+  N := GetNumHexDigits(Sz);
+  LCh := Chr(Ord('0')+N);
+  FmtS[p] := LCh;
+  FmtS[p+2] := LCh;
+end ;
+
+procedure ShowDump(DP, {File 0 address, show file offsets if present}
+  DPFile0: PChar; {Dump address}
+  FileSize,SizeDispl {used to calculate display offset digits},
   Size {Dump size}: Cardinal;
   Ofs0Displ {initial display offset},
   Ofs0 {offset in DCU data block - for fixups},
   WMin{Minimal dump width (in bytes)}: Cardinal;
   FixCnt: integer; FixTbl: PFixupTbl;
   FixUpNames: boolean);
-const
-  FmtS: String='%0.0x: %s';
 var
   LP: PChar;
   LS,W: Cardinal;
-  DS,FixS,FS,DumpFmt: String;
+  FmtS,DS,FixS,FS,DumpFmt: String;
   DSP,CP: PChar;
   Sz,LSz,dOfs: Cardinal;
-  LCh,Ch: Char;
+  Ch: Char;
 //  IsBig: boolean;
   FP: PFixupRec;
   K: Byte;
@@ -345,18 +390,16 @@ begin
     PutS('[]');
     Exit;
   end ;
-  LSz := 0;
+  if DPFile0=Nil then
+    FmtS := OfsFmtS
+  else begin
+    FmtS := FileOfsFmtS;
+    SetHexFmtNumDigits(FmtS,8,FileSize);
+  end ;
   if SizeDispl=0 then
     SizeDispl := Size;
-  Sz := Ofs0Displ+SizeDispl;
-  while Sz>0 do begin
-    Inc(LSz);
-    Sz := Sz shr 4;
-  end ;
+  SetHexFmtNumDigits(FmtS,2,Ofs0Displ+SizeDispl);
   W := 16;
-  LCh := Chr(Ord('0')+LSz);
-  FmtS[2] := LCh;
-  FmtS[4] := LCh;
   LP := DP;
 //  IsBig := Size>W;
   if Size<W then begin
@@ -375,7 +418,7 @@ begin
     LSz := W;
     if LSz>Size then
       LSz := Size;
-    PutSFmt(FmtS,[Ofs0Displ+(LP-DP),CharDumpStr(LP^,LSz)]);
+    PutSFmt(FmtS,[Ofs0Displ+(LP-DP),LP-DPFile0,CharDumpStr(LP^,LSz)]);
     if (LSz<W){and IsBig} then
       PutS(CharNStr(' ',W-LSz));
     DS := Format(DumpFmt{'|%s|'},[DumpStr(LP^,LSz)]);
@@ -483,7 +526,10 @@ begin
     WStr[0] := WCh;
     Word(WStr[1]) := 0;
     S := WideCharToString(WStr);
-    Ch := S[1];
+    if Length(S)>0 then
+      Ch := S[1]
+    else
+      Ch := '.';
   end ;
   if Ch<' ' then
     Result := Format('#%d',[Word(WCh)])

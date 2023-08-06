@@ -1,34 +1,9 @@
 unit op;
-{ Generated automatically from d:\prolog\codes\opdata2.cmd, 05.11.1999 11:25:27 }
-(*
-The i586 opcodes module of the DCU32INT utility by Alexei Hmelnov.
-You can edit it manually, but I don't advise to do it.
-----------------------------------------------------------------------------
-E-Mail: alex@monster.icc.ru
-http://monster.icc.ru/~alex/DCU/
-----------------------------------------------------------------------------
-
-See the file "readme.txt" for more details.
-
-------------------------------------------------------------------------
-                             IMPORTANT NOTE:
-This software is provided 'as-is', without any expressed or implied warranty.
-In no event will the author be held liable for any damages arising from the
-use of this software.
-Permission is granted to anyone to use this software for any purpose,
-including commercial applications, and to alter it and redistribute it
-freely, subject to the following restrictions:
-1. The origin of this software must not be misrepresented, you must not
-   claim that you wrote the original software.
-2. Altered source versions must be plainly marked as such, and must not
-   be misrepresented as being the original software.
-3. This notice may not be removed or altered from any source
-   distribution.
-*)
+{ Generated automatically from D:\PROLOG\CODES\Opdata2.cmd, 27.10.2002 21:57:36 }
 
 interface
 
-uses DAsmUtil;
+uses DAsmDefs, DAsmUtil;
 
 const
   hnQ = $0 or nf;
@@ -666,22 +641,22 @@ var
 
 const
   _C0: array[0..$FF] of integer = (
-    {0x00}  0,  1,  2,  3, 49,  4,  5, 49,  6,  7, 49,  8, 49, 49, 49, 49,
-    {0x10} 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49,
-    {0x20}  9, 10, 11, 12, 13, 49, 14, 49, 49, 49, 49, 49, 49, 49, 49, 49,
-    {0x30} 15, 16, 17, 18, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49,
+    {0x00}  0,  1,  2,  3, 50,  4,  5, 50,  6,  7, 50,  8, 50, 50, 50, 50,
+    {0x10} 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50,
+    {0x20}  9, 10, 11, 12, 13, 50, 14, 50, 50, 50, 50, 50, 50, 50, 50, 50,
+    {0x30} 15, 16, 17, 18, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50,
     {0x40} 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19,
-    {0x50} 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49,
-    {0x60} 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49,
-    {0x70} 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49,
+    {0x50} 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50,
+    {0x60} 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50,
+    {0x70} 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50,
     {0x80} 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20,
     {0x90} 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21,
-    {0xA0} 22, 23, 24, 25, 26, 27, 28, 28, 29, 30, 31, 32, 33, 34, 49, 35,
-    {0xB0} 49, 49, 36, 37, 38, 39, 40, 40, 49, 41, 42, 43, 44, 45, 46, 46,
-    {0xC0} 47, 47, 49, 49, 49, 49, 49, 49, 48, 48, 48, 48, 48, 48, 48, 48,
-    {0xD0} 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49,
-    {0xE0} 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49,
-    {0xF0} 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49, 49
+    {0xA0} 22, 23, 24, 25, 26, 27, 28, 28, 29, 30, 31, 32, 33, 34, 50, 35,
+    {0xB0} 36, 36, 37, 38, 39, 40, 41, 41, 50, 42, 43, 44, 45, 46, 47, 47,
+    {0xC0} 48, 48, 50, 50, 50, 50, 50, 50, 49, 49, 49, 49, 49, 49, 49, 49,
+    {0xD0} 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50,
+    {0xE0} 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50,
+    {0xF0} 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50
   );
 
 begin
@@ -867,55 +842,60 @@ begin
         if not readRMD(1) then Exit;
       end;
     36: begin
+        D := B0 and $1;
+        SetOpName(hnCMPXCHG);
+        if not readRMD(D) then Exit;
+      end;
+    37: begin
         SetOpName(hnLSS);
         if not ReadRMWD(2) then Exit;
       end;
-    37: begin
+    38: begin
         SetOpName(hnBTR);
         if not readRMR(1) then Exit;
       end;
-    38: begin
+    39: begin
         SetOpName(hnLFS);
         if not ReadRMWD(2) then Exit;
       end;
-    39: begin
+    40: begin
         SetOpName(hnLGS);
         if not ReadRMWD(2) then Exit;
       end;
-    40: begin
+    41: begin
         W := B0 and $1;
         SetOpName(hnMOVZX);
         if not ReadRMWD(W) then Exit;
       end;
-    41: SetOpName(hnILLEG1);
-    42: begin
+    42: SetOpName(hnILLEG1);
+    43: begin
         if not readEA(1,_1) then Exit;
         SetOpName(ntBtOp[_1]);
         if not ImmedBW(0) then Exit;
       end;
-    43: begin
+    44: begin
         SetOpName(hnBTC);
         if not readRMR(1) then Exit;
       end;
-    44: begin
+    45: begin
         SetOpName(hnBSF);
         if not readRMD(1) then Exit;
       end;
-    45: begin
+    46: begin
         SetOpName(hnBSR);
         if not readRMD(1) then Exit;
       end;
-    46: begin
+    47: begin
         W := B0 and $1;
         SetOpName(hnMOVSX);
         if not ReadRMWD(W) then Exit;
       end;
-    47: begin
+    48: begin
         W := B0 and $1;
         SetOpName(hnXADD);
         if not readRMD(W) then Exit;
       end;
-    48: begin
+    49: begin
         R := B0 and $7;
         SetOpName(hnBSWAP);
         if not RegW(R,_1) then Exit;
@@ -1027,7 +1007,7 @@ begin
      L := C and $1;
      setEASize(2);
    end
-  else
+  else 
     Exit;
   Result := true;
 end ;

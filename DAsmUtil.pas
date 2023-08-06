@@ -1,9 +1,9 @@
-unit DAsmUtil;
+unit DasmUtil;
 (*
-The main disassembler module of the DCU32INT utility by Alexei Hmelnov.
+The main i80x86 disassembler module of the DCU32INT utility by Alexei Hmelnov.
 ----------------------------------------------------------------------------
-E-Mail: alex@monster.icc.ru
-http://monster.icc.ru/~alex/DCU/
+E-Mail: alex@icc.ru
+http://hmelnov.icc.ru/DCU/
 ----------------------------------------------------------------------------
 
 See the file "readme.txt" for more details.
@@ -26,12 +26,7 @@ freely, subject to the following restrictions:
 interface
 
 uses
-  FixUp;
-
-const
-  nf =  $40000000;
-  nm =  nf-1;
-  hEA = $7FFFFFFF;
+  DasmDefs,FixUp;
 
   function Identic(I: integer): integer;
   function ReadByte(var B: integer): boolean;
@@ -58,8 +53,6 @@ const
   function GetOS: integer;
 
 type
-  THBMName = integer;
-
   PBMTblProc = ^TBMTblProc;
   TBMTblProc = array[byte]of THBMName;
 
@@ -124,9 +117,11 @@ const
 
   hNoSeg=7;
   hDefSeg=8;
-  DefEASeg : array[0..7] of Byte = (
-    hDS, hDS, hSS, hSS, hDS, hDS, hDS, hDS
-  ) ;
+
+  DefEASeg: array[0..7] of Byte = (
+    hDS, hDS, hSS, hSS, hDS, hDS, hDS, hDS);
+  DefRegSeg: array[0..7] of Byte = (
+    hDS, hDS, hDS, hDS, hSS, hSS, hDS, hDS);
 
 type
   TRegNum=0..7;
@@ -169,10 +164,7 @@ var
   AdrIs32: boolean;
   OpIs32: boolean;
 
-var
-  CodePtr, PrevCodePtr: PChar;
-
-procedure ClearCommand;
+//procedure ClearCommand;
 
 function ReadCommand: boolean;
 
@@ -182,10 +174,14 @@ var
   RegTbl:array[0..2] of PBMTblProc;
   SegRegTbl: PBMTblProc;
 
+//function GetIntData(hDSize,Ofs:Byte;var I: LongInt): boolean;
+function CheckCommandRefs(RegRef: TRegCommandRefProc; CmdOfs: Cardinal;
+  IP: Pointer): integer;
+
 implementation
 
 uses
-  SysUtils, op, DCU_In, DCU_Out;
+  SysUtils, op, {DCU_In,} DCU_Out;
 
 
 var {For unread}
@@ -456,15 +452,17 @@ begin
           SIB := 0;
         Cmd.EA.hBase := Lo3+SIB shl 4;
        end
-      else if (Up2=0)and(Lo3 = hBP) then begin
+      else {No SIB} if (Up2=0)and(Lo3 = hBP) then begin
         Cmd.EA.hBase := 0;
         if not ReadImmedData(SizeOf(LongInt),ImOfs,Cmd.EA.Fix) then
           Exit;
         Cmd.EA.dOfs := dsDbl shl 5 or ImOfs;
         Lo3 := 0;{For OpSeg}
       end;
+      if OpSeg=hDefSeg then
+        OpSeg := hDefSeg or DefRegSeg[Lo3 and 7];
      end
-    else begin
+    else {not AdrIs32} begin
       Cmd.EA.hBase := RMS[Lo3];
       if (Up2=0)and(Lo3 = 6) then begin
         Cmd.EA.hBase := 0;
@@ -473,6 +471,8 @@ begin
         Cmd.EA.dOfs := dsWord shl 5 or ImOfs;
         Lo3 := 0;{For OpSeg}
       end ;
+      if OpSeg=hDefSeg then
+        OpSeg := hDefSeg or DefEASeg[Lo3 and 7];
     end ;
     Case Up2 of
       1: begin
@@ -487,8 +487,6 @@ begin
       end ;
     End ;
     {GetMemStr := GetSegStr+'['+MS+']' ;}
-    if OpSeg=hDefSeg then
-      OpSeg := hDefSeg or DefEASeg[Lo3 and 7];
     Cmd.EA.hSeg := OpSeg or (OpSize+1)shl 4;
   end ;
   Result := CodePtr<=CodeEnd;
@@ -496,7 +494,7 @@ end ;
 
 function getImmOfsEA(W: integer;var A: integer): boolean;
 var
-  CurB,Up2,Lo3 : Byte ;
+  CurB : Byte ;
   OpSize:byte;
   imOfs: Byte;
 begin
@@ -560,17 +558,45 @@ begin
   PutSFmt('%d',[i]);
 end ;
 
-procedure WriteImmed(hDSize,Ofs:Byte; MayBeAddr: boolean; Fix: PFixupRec);
+procedure WriteRegVarInfo(hReg: THBMName; Ofs: integer; IsFirst: boolean);
+var
+  S: String;
+begin
+  if not Assigned(GetRegVarInfo) then
+    Exit;
+  if IsFirst then {i.e. It may be an assignment target}
+    S := GetRegVarInfo(CodePtr-CodeBase,hReg,Ofs)
+  else
+    S := GetRegVarInfo(PrevCodePtr-CodeBase,hReg,Ofs);
+  if S<>'' then
+    PutSFmt('{%s}',[S]);
+end ;
+
+procedure WriteRegName(hN: THBMName; IsFirst: boolean);
+begin
+  WriteBMOpName(hN);
+  WriteRegVarInfo(hN,0,IsFirst);
+end ;
+
+function WriteImmed(hDSize,Ofs:Byte; MayBeAddr: boolean; Fix: PFixupRec): LongInt;
 var
   DP,DP1: Pointer;
-  IsAddr: boolean;
-  A: Pointer;
+  DS: Byte;
+  {IsAddr: boolean;
+  A: Pointer;}
   Fixed: boolean;
-  V: LongInt;
 begin
+  Result := 0;
   DP := PrevCodePtr+Ofs;
-  Fixed := ReportFixUp(Fix);
-//  if (ReportFixUp(Cardinal(DP)-Cardinal(CodeStart),hDSize and dsMask,DP)=0{<>0})
+  DS := hDSize and dsMask;
+  Case DS of
+   dsByte: Result := Byte(DP^);
+   dsWord: Result := Word(DP^);
+   dsDbl: Result := LongInt(DP^);
+  End ;
+  Fixed := ReportFixUp(Fix,Result);
+  {
+//  if (ReportFixUp(Cardinal(DP)-Cardinal(CodeStart),hDSize and dsMask,DP)=0)
 //  then begin
     IsAddr := MayBeAddr and((Ord(AdrIs32Deft)+dsWord)=hDSize);
     if IsAddr then begin
@@ -580,76 +606,71 @@ begin
         LongInt(A) := LongInt(DP^);
 //      StartStrInfo(siDataAddr,A);
     end ;
-    if Fixed and(hDSize and dsMask<>dsDbl) then
-      PutS('+');
-    Case hDSize and dsMask of
-      dsByte: PutSFmt('$%2.2x',[Byte(DP^)]);
-      dsWord: PutSFmt('$%4.4x',[Word(DP^)]);
-      dsDbl: begin
-          V := LongInt(DP^);
-          if Fixed then begin
-            Fixed := V=0;
-            if not Fixed then
-              PutS('+');
-          end ;
-          if not Fixed then
-            PutSFmt('$%8.8x',[V]);
-        end ;
-      dsPtr:  if not OpIs32 then
-                PutSFmt('$%8.8x',[LongInt(DP^)])
-              else begin
-                DP1 := DP;
-                Inc(integer(DP1),4);
-                PutSFmt('$%4.4x:$%8.8x',[Word(DP1^),LongInt(DP^)]);
-              end ;
-      dsQWord: PutS(CharDumpStr(DP^,8));
-      dsTWord: PutS(CharDumpStr(DP^,10));
-    else
-      PutS('?Immed');
-    End ;
-//    if IsAddr then
-//      EndStrInfo;
-//  end ;
+    }
+  if Fixed then begin
+    if (DS=dsDbl){and(Result=0)} then
+      Exit;
+    PutS('{+');
+  end ;
+  Case DS of
+   dsByte: PutSFmt('$%2.2x',[Result]);
+   dsWord: PutSFmt('$%4.4x',[Result]);
+   dsDbl: PutSFmt('$%8.8x',[Result]);
+   dsPtr:
+     if not OpIs32 then begin
+       Result := LongInt(DP^);
+       PutSFmt('$%8.8x',[Result])
+      end
+     else begin
+       DP1 := DP;
+       Inc(integer(DP1),4);
+       PutSFmt('$%4.4x:$%8.8x',[Word(DP1^),LongInt(DP^)]);
+     end ;
+   dsQWord: PutS(CharDumpStr(DP^,8));
+   dsTWord: PutS(CharDumpStr(DP^,10));
+  else
+    PutS('?Immed');
+  End ;
+  if Fixed then
+    PutS('}');
+//  if IsAddr then
+//    EndStrInfo;
+//end ;
 end ;
 
 function WriteIntData(SignRq,FixSignRq: boolean;hDSize,Ofs:Byte; Fix: PFixupRec): LongInt;
 var
   DP: Pointer;
-  DOfs: LongInt;
+  DS: Byte;
   Fixed: boolean;
-  V: LongInt;
 begin
   DP := PrevCodePtr+Ofs;
-  Case hDSize and dsMask of
-    dsByte: DOfs := ShortInt(DP^);
-    dsWord: DOfs := SmallInt(DP^);
-    dsDbl:  DOfs := LongInt(DP^);
+  DS := hDSize and dsMask;
+  Case DS of
+   dsByte: Result := ShortInt(DP^);
+   dsWord: Result := SmallInt(DP^);
+   dsDbl:  Result := LongInt(DP^);
   else
     PutS('?Int');
+    Result := 0;
     Exit;
   End ;
-  if SignRq and ((DOfs>0)or FixSignRq and FixupOk(Fix)) then
+  if SignRq and ((Result>0)or FixSignRq and FixupOk(Fix)) then
     PutS('+');
 //  if (ReportFixUp(Cardinal(DP)-Cardinal(CodeStart),hDSize and dsMask,DP)=0{<>0})
 //  then
-   Fixed := ReportFixUp(Fix);
-   if Fixed and(hDSize and dsMask<>dsDbl) then
-     PutS('+');
-   Case hDSize and dsMask of
-     dsByte: WriteInt(ShortInt(DP^));
-     dsWord: WriteInt(SmallInt(DP^));
-     dsDbl: begin
-       V := LongInt(DP^);
-       if Fixed then begin
-         Fixed := V=0;
-         if not Fixed then
-           PutS('+');
-       end ;
-       if not Fixed then
-         WriteInt(LongInt(DP^));
-     end ;
-   End ;
-  WriteIntData := DOfs;
+  Fixed := ReportFixUp(Fix,Result);
+  if Fixed then begin
+    if (DS=dsDbl){and(Result=0)} then
+      Exit;
+  end ;
+  if SignRq and(Result=0) then
+    Exit;
+  if Fixed then
+    PutS('{+');
+  WriteInt(Result);
+  if Fixed then
+    PutS('}');
 end ;
 
 procedure WriteJmpOfs(hDSize,Ofs:Byte; Fix: PFixupRec);
@@ -665,26 +686,26 @@ begin
 end ;
 
 function ReportImmed(IsInt,SignRq: boolean;DSF,hDSize,SegN,Ofs:Byte;
-  Fix: PFixupRec): boolean;
-var
-  RepRes: Byte;
+  Fix: PFixupRec): LongInt;
+{var
+  RepRes: Byte;}
 begin
   {if ReportDataRefsOn then
     RepRes := ReportDataRefs(SignRq,DSF,hDSize,SegN,Ofs)
   else}
-    RepRes := 0;
+    {RepRes := 0;
   if RepRes>1 then
-    PutS('{');
-  if (not IsInt)or(RepRes>0) then begin
+    PutS('{');}
+  if (not IsInt){or(RepRes>0)} then begin
     if SignRq then
       PutS('+');
-    WriteImmed(hDSize,Ofs,RepRes>0,Fix);
+    Result := WriteImmed(hDSize,Ofs,{RepRes>0}false{MayBeAddr},Fix);
    end
   else
-    WriteIntData(SignRq,true,hDSize,Ofs,Fix);
-  if RepRes>1 then
-    PutS('}');
-  ReportImmed := RepRes>1;
+    Result := WriteIntData(SignRq,true,hDSize,Ofs,Fix);
+  //if RepRes>1 then
+  //  PutS('}');
+  //ReportImmed := RepRes>1;
 end ;
 
 procedure WriteEA;
@@ -692,6 +713,7 @@ var
   SegN,DSF: Byte;
   Cnt:integer;
   RepRes: boolean;
+  hLastReg: byte;
 
   procedure Plus;
   begin
@@ -700,19 +722,29 @@ var
     Inc(Cnt);
   end ;
 
-  procedure WriteReg(hReg,SS:Byte);
+  procedure WriteReg(hReg,SS:Byte; ShowVar: boolean);
   const
     ScaleStr: array[0..3] of String[3] = ('','2*','4*','8*');
   begin
     if hReg and hPresent=0 then
       Exit;
+    hReg := RegTbl[1+Ord(AdrIs32)]^[hReg and $7];
+    if SS=0 then
+      hLastReg := hReg;
     Plus;
     if (SS>0)and(SS<=3) then begin
       PutS(ScaleStr[SS]);
     end ;
-    WriteBMOpName(RegTbl[1+Ord(AdrIs32)]^[hReg and $7]);
+    if ShowVar and(SS=0) then
+      WriteRegName(hReg,false{IsFirst})
+    else
+      WriteBMOpName(hReg);
   end ;
 
+var
+  hR1,hR2: byte;
+  Fixed,AsExpr: boolean;
+  D: LongInt;
 begin
   DSF := (Cmd.EA.hSeg shr 4)and dsMask;
   Case DSF of
@@ -737,18 +769,27 @@ begin
   end ;
   Cnt := 0;
   PutS('[');
-  WriteReg(Cmd.EA.hBase and $f,0);
-  WriteReg(Cmd.EA.hBase shr 4,Cmd.EA.SS);
+  Fixed := FixupOk(Cmd.EA.Fix);
+  hR1 := Cmd.EA.hBase and $f;
+  hR2 := Cmd.EA.hBase shr 4;
+  AsExpr := (not Fixed)and((hR1 and hPresent<>0)<>(hR2 and hPresent<>0)
+    and(Cmd.EA.SS=0));
+  WriteReg(hR1,0,not AsExpr);
+  WriteReg(hR2,Cmd.EA.SS,not AsExpr);
   if Cmd.EA.dOfs<>0 then
-    ReportImmed(Cnt>0,Cnt>0,DSF,
-            Cmd.EA.dOfs shr 5,SegN and $7,Cmd.EA.dOfs and $1f,Cmd.EA.Fix);
+    D := ReportImmed(Cnt>0{IsInt},Cnt>0{SignRq},DSF,Cmd.EA.dOfs shr 5{hDSize},
+      SegN and $7,Cmd.EA.dOfs and $1f{Ofs},Cmd.EA.Fix)
+  else
+    D := 0;
+  if AsExpr then
+    WriteRegVarInfo(hLastReg,D,false{IsFirst});
   PutS(']');
 end ;
 
-procedure WriteArg(const A: TCmArg);
+procedure WriteArg(const A: TCmArg; IsFirst: boolean);
 begin
   Case A.Kind and caMask of
-    caReg: WriteBMOpName(A.Inf);
+    caReg: WriteRegName(A.Inf,IsFirst);
     caEffAdr:WriteEA;
     caVal: PutSFmt('$%x',[A.Inf]);
     caImmed: ReportImmed(false,false,0,A.Kind shr 4,hCS,A.Inf,A.Fix);
@@ -795,7 +836,87 @@ begin
       PutS(SeprChar);
       SeprChar := ',';
     end ;
-    WriteArg(Cmd.Arg[i]);
+    WriteArg(Cmd.Arg[i],i=1{IsFirst});
+  end ;
+end ;
+
+function GetIntData(hDSize,Ofs:Byte;var I: LongInt): boolean;
+var
+  DP: Pointer;
+begin
+  DP := PrevCodePtr;
+  Inc(Cardinal(DP),Ofs);
+  Case hDSize and dsMask of
+    dsByte: I := ShortInt(DP^);
+    dsWord: I := SmallInt(DP^);
+    dsDbl:  I := LongInt(DP^);
+  else
+    GetIntData := false;
+    Exit;
+  End ;
+  GetIntData := true;
+end ;
+
+function CheckCommandRefs(RegRef: TRegCommandRefProc; CmdOfs: Cardinal;
+  IP: Pointer): integer{crX};
+
+  function RegisterCodeRef(RefKind: Byte; i: integer): boolean;
+  var
+    RefP: LongInt;
+    DP: Pointer;
+    Ofs: LongInt;
+  begin
+    Result := false;
+    if i>Cmd.Cnt then
+      Exit;
+    with Cmd.Arg[i{Cmd.Cnt}] do
+     Case Kind and caMask of
+       {caImmed: begin
+           if (Kind shr 4)and dsMask <> dsPtr then
+             Exit;
+           DP := PChar(PrevCodePtr)+Inf;
+           RefP := LongInt(DP^);
+         end ;}
+       caJmpOfs: begin
+           if Fix<>Nil then
+             Exit; //!!!
+           if not GetIntData(Kind shr 4,Inf,Ofs) then
+             Exit;
+           RefP := CmdOfs+Ofs;
+         end;
+     else
+       Exit;
+     End ;
+    RegRef(RefP,RefKind,IP);
+    Result := true;
+  end ;
+
+begin
+  case Cmd.hCmd of
+   hnRet: begin
+     Result := crJmp;
+     Exit;
+    end ;
+   {!!! - temp
+   hnCall: begin
+     RegisterCodeRef(Seq,crCall,1);
+     RegisterCodeRef(Seq,crCall,2);
+    end ;}
+   hnJMP: begin
+     Result := crJmp;
+     RegisterCodeRef(crJmp,1);
+    end ;
+   hnJ_: begin
+     Result := crJCond;
+     RegisterCodeRef(crJCond,2);
+    end ;
+   hnLOOP, hnLOOPE, hnLOOPNE, hnJCXZ: begin
+     Result := crJCond;
+     RegisterCodeRef(crJCond,1);
+    end ;
+  else
+    Result := -1;
+    Exit;
   end ;
 end ;
 

@@ -2,8 +2,8 @@ unit FixUp;
 (*
 The DCU Fixup information module of the DCU32INT utility by Alexei Hmelnov.
 ----------------------------------------------------------------------------
-E-Mail: alex@monster.icc.ru
-http://monster.icc.ru/~alex/DCU/
+E-Mail: alex@icc.ru
+http://hmelnov.icc.ru/DCU/
 ----------------------------------------------------------------------------
 
 See the file "readme.txt" for more details.
@@ -37,7 +37,16 @@ const {Fixup type constants}
   fxEnd20 = 4;
   fxStart30 = 5;
   fxEnd30 = 6;
+  fxStart70 = 6;
+  fxEnd70 = 7;
 
+  fxStartMSIL = $0B;
+  fxEndMSIL = $0C;
+
+  fxStart100 = $0C;
+  fxEnd100 = $0D;
+
+var
   fxStart: Byte = fxStart30;
   fxEnd: Byte = fxEnd30;
 
@@ -95,12 +104,12 @@ function GetFixupFor(CodePtr:PChar; Size: Cardinal; StartOk: boolean;
   var Fix: PFixupRec): boolean;
 
 function FixupOk(Fix: PFixupRec): boolean;
-function ReportFixup(Fix: PFixupRec): boolean;
+function ReportFixup(Fix: PFixupRec; Ofs: LongInt): boolean;
 
 implementation
 
 uses
-  DCU_Out, DCU32;
+  DCU_Out, DCU32, DCURecs;
 
 var
   CodeFixupCnt: integer;
@@ -279,7 +288,11 @@ begin
   Result := (Fix<>Nil)and(FixUnit<>Nil);
 end ;
 
-function ReportFixup(Fix: PFixupRec): boolean;
+function ReportFixup(Fix: PFixupRec; Ofs: LongInt): boolean;
+var
+  U: TUnit;
+  D: TDCURec;
+  hDT: integer;
 begin
   Result := false;
   if (Fix=Nil)or(FixUnit=Nil) then
@@ -287,7 +300,18 @@ begin
   Inc(AuxLevel);
   PutSFmt('K%x ',[TByte4(Fix^.OfsF)[3]]);
   Dec(AuxLevel);
-  PutS(TUnit(FixUnit).GetAddrStr(Fix^.NDX,true));
+  PutS(TUnit(FixUnit).GetAddrStr(Fix^.NDX,true{ShowNDX}));
+  {D := TUnit(FixUnit).GetAddrDef(Fix^.NDX);
+  PutS(GetDCURecStr(D,Fix^.NDX,true));}
+ // if Ofs<>0 then begin
+    D := TUnit(FixUnit).GetGlobalAddrDef(Fix^.NDX,U);
+    hDT := -1;
+    if D<>Nil then begin
+      if D is TVarDecl then
+        hDT := TVarDecl(D).hDT;
+    end ;
+    PutS(U.GetOfsQualifier(hDT,Ofs));
+ // end ;
   Result := true;
 end ;
 
