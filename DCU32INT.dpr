@@ -1,5 +1,10 @@
 {$A+,B-,C+,D+,E-,F-,G+,H+,I+,J+,K-,L+,M-,N+,O+,P+,Q-,R-,S-,T-,U-,V+,W-,X+,Y+,Z1}
 {$APPTYPE CONSOLE}
+{$IFDEF ConditionalExpressions}
+{$WARN UNSAFE_TYPE OFF}
+{$WARN UNSAFE_CODE OFF}
+{$WARN UNSAFE_CAST OFF}
+{$ENDIF}
 program dcu32int;
 (*
 The main module of the DCU32INT utility by Alexei Hmelnov.
@@ -36,6 +41,11 @@ uses
   FixUp in 'FixUp.pas',
   DCURecs in 'DCURecs.pas',
   DasmDefs in 'DasmDefs.pas',
+ {$IFDEF XMLx86}
+  x86Reg in '80x86\x86Reg.pas',
+  x86Defs in '80x86\x86Defs.pas',
+  x86Op in '80x86\x86Op.pas',
+ {$ENDIF}
   DasmCF in 'DasmCF.pas',
   DCP in 'DCP.pas',
   DasmX86 in 'DasmX86.pas',
@@ -77,6 +87,8 @@ begin
   '    S(-) - check unit Stamps'#13#10+
   ' -I - interface part only'#13#10+
   ' -U<paths> - Unit directories, * means autodetect by unit version'#13#10+
+  ' -LF[<File name>] - Libraries Config.ini file name (used by -U with *)'#13#10+
+  ' -LD - use debug libraries (used by -U with *)'#13#10+
   ' -P<paths> - Pascal source directories (just "-P" means: "seek for *.pas in'#13#10+
   '    the unit directory"). Without this parameter src lines won''t be reported'#13#10+
   ' -R<Alias>=<unit>[;<Alias>=<unit>]* - set unit aliases'#13#10+
@@ -88,7 +100,8 @@ begin
   '    V(-) - class virtual methods'#13#10+
   ' -A<Mode> - disAssembler mode'#13#10+
   '    S(+) - simple Sequential (all memory is a sequence of ops)'#13#10+
-  '    C(-) - control flow'#13#10
+  '    C(-) - Control flow'#13#10+
+  '    D(-) - control and Data flow'#13#10
   );
 end ;
 
@@ -185,6 +198,20 @@ begin
           Delete(PS,1,2);
           DCUPath := PS;
         end ;
+        'L': begin
+          Ch := PChar(PS)[2];
+          case ch of
+           'F': begin
+             Delete(PS,1,3);
+             if PS='' then
+               PS := ExtractFilePath(ParamStr(0))+'Config.ini';
+             LibConfigFN := PS;
+            end ;
+           'D': PreferDebugLib := true;
+          else
+            Writeln('Unknown lib config option: "',PS,'"');
+          end ;
+         end ;
         'R': begin
           Delete(PS,1,2);
           SetUnitAliases(PS);
@@ -209,6 +236,7 @@ begin
            case Ch of
             'S': DasmMode := dasmSeq;
             'C': DasmMode := dasmCtlFlow;
+            'D': DasmMode := dasmDataFlow; //Not completely implemented yet, == -AC by now
            else
              Writeln('Unknown disassembler mode: "',Ch,'"');
              Exit;
@@ -506,7 +534,7 @@ end ;
 begin
   {$IFDEF CONDITIONALEXPRESSIONS}
   {$IF Declared(FormatSettings)}
-  FormatSettings. //Required since XE6
+  FormatSettings. //Required since XE6, exists since XE
   {$IFEND}
   {$ENDIF}
   DecimalSeparator := '.';

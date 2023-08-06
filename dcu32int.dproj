@@ -4,7 +4,7 @@
         <MainSource>dcu32int.dpr</MainSource>
         <Base>True</Base>
         <Config Condition="'$(Config)'==''">Debug</Config>
-        <TargetedPlatforms>1</TargetedPlatforms>
+        <TargetedPlatforms>3</TargetedPlatforms>
         <AppType>Console</AppType>
         <FrameworkType>None</FrameworkType>
         <ProjectVersion>16.1</ProjectVersion>
@@ -78,6 +78,10 @@
         <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.20.1.96;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win64)'!=''">
+        <VerInfo_Locale>1033</VerInfo_Locale>
+        <VerInfo_IncludeVerInfo>false</VerInfo_IncludeVerInfo>
+        <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+        <DCC_Namespace>System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;$(DCC_Namespace)</DCC_Namespace>
         <Icon_MainIcon>dcu32int_Icon.ico</Icon_MainIcon>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1)'!=''">
@@ -98,10 +102,11 @@
         <DCC_GenerateStackFrames>true</DCC_GenerateStackFrames>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
+        <DCC_Define>XMLx86;$(DCC_Define)</DCC_Define>
         <VerInfo_Build>82</VerInfo_Build>
         <VerInfo_MinorVer>20</VerInfo_MinorVer>
         <DCC_DebugDCUs>true</DCC_DebugDCUs>
-        <Debugger_RunParams>F:\users\GIS\Users\Alex\Delphi\_compile\D8\test1.dcuil -S</Debugger_RunParams>
+        <Debugger_RunParams>F:\users\GIS\Users\Alex\Delphi\10_2Tokyo\lib\linux64\debug\System.dcu -AC</Debugger_RunParams>
         <VerInfo_Keys>CompanyName=AX;FileDescription=Parser of Delphi 2.0-8.0, 2005-2006 (.net and WIN32), 2007-2010 (WIN32 only),  XE (WIN32 only), XE2-XE7 (WIN32,WIN64,OSX32), Kylix 1.0-3.0;FileVersion=1.20.1.82;InternalName=DCU32INT;LegalCopyright=Copyright ©2000-2015, Alexei E. Hmelnov;LegalTrademarks=;OriginalFilename=DCU32INT;ProductName=DCU32INT;ProductVersion=1.20.1;Comments=</VerInfo_Keys>
         <VerInfo_Locale>1033</VerInfo_Locale>
     </PropertyGroup>
@@ -116,6 +121,9 @@
         <DCCReference Include="FixUp.pas"/>
         <DCCReference Include="DCURecs.pas"/>
         <DCCReference Include="DasmDefs.pas"/>
+        <DCCReference Include="80x86\x86Reg.pas"/>
+        <DCCReference Include="80x86\x86Defs.pas"/>
+        <DCCReference Include="80x86\x86Op.pas"/>
         <DCCReference Include="DasmCF.pas"/>
         <DCCReference Include="DCP.pas"/>
         <DCCReference Include="DasmX86.pas"/>
@@ -146,7 +154,7 @@
                     <VersionInfo Name="MajorVer">1</VersionInfo>
                     <VersionInfo Name="MinorVer">15</VersionInfo>
                     <VersionInfo Name="Release">1</VersionInfo>
-                    <VersionInfo Name="Build">107</VersionInfo>
+                    <VersionInfo Name="Build">108</VersionInfo>
                     <VersionInfo Name="Debug">False</VersionInfo>
                     <VersionInfo Name="PreRelease">False</VersionInfo>
                     <VersionInfo Name="Special">False</VersionInfo>
@@ -158,7 +166,7 @@
                 <VersionInfoKeys>
                     <VersionInfoKeys Name="CompanyName">AX</VersionInfoKeys>
                     <VersionInfoKeys Name="FileDescription">Parser of Delphi 2.0-8.0, 2005(.net and WIN32), 2006-2010 (WIN32 only),  XE (WIN32 only), XE2, Kylix 1.0-3.0</VersionInfoKeys>
-                    <VersionInfoKeys Name="FileVersion">1.15.1.107</VersionInfoKeys>
+                    <VersionInfoKeys Name="FileVersion">1.15.1.108</VersionInfoKeys>
                     <VersionInfoKeys Name="InternalName">DCU32INT</VersionInfoKeys>
                     <VersionInfoKeys Name="LegalCopyright">Copyright ©2000-2012, Alexei E. Hmelnov</VersionInfoKeys>
                     <VersionInfoKeys Name="LegalTrademarks"/>
@@ -175,7 +183,7 @@
             <Platforms>
                 <Platform value="OSX32">False</Platform>
                 <Platform value="Win32">True</Platform>
-                <Platform value="Win64">False</Platform>
+                <Platform value="Win64">True</Platform>
             </Platforms>
             <ModelSupport>False</ModelSupport>
         </BorlandProject>

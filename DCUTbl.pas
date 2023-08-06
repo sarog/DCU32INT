@@ -29,7 +29,7 @@ freely, subject to the following restrictions:
 interface
 
 uses
-  SysUtils,Classes,DCU32,DCP{$IFDEF Win32},Windows{$ENDIF};
+  SysUtils,Classes,DCU32,DCP{$IFDEF Win32},Windows{$ENDIF},IniFiles;
 
 const
   PathSep = {$IFNDEF LINUX}';'{$ELSE}':'{$ENDIF};
@@ -38,6 +38,8 @@ const
 var
   DCUPath: String='*'; {To disable LIB directory autodetection use -U flag}
   PASPath: String='*' {Let only presence of -P signals, that source lines are required};
+  LibConfigFN: String = ''; //For autodetection
+  PreferDebugLib: Boolean = false; //For autodetection
   TopLevelUnitClass: TUnitClass = TUnit;
   IgnoreUnitStamps: Boolean = true;
 
@@ -50,7 +52,7 @@ function GetDCUOfMemory(MemP: Pointer): TUnit;
 
 procedure FreeDCU;
 
-procedure LoadSourceLines(FName: String; Lines: TStrings);
+procedure LoadSourceLines(const FName: String; Lines: TStrings);
 
 procedure SetUnitAliases(const V: String);
 
@@ -84,7 +86,9 @@ begin
       Continue;}
     Pkg.Free;
   end ;
-  PathList.Clear;
+  //PathList.Clear;
+  PathList.Free;
+  PathList := Nil;
 end ;
 
 function ExtractFileNamePkg(const FN: String): String;
@@ -98,19 +102,109 @@ begin
     Result := StrPas(CP+1);
 end ;
 
+function GetVerTag(Ver: integer): String;
+const
+  sVerName: array[2..MaxDelphiVer]of String = (
+    'D2',
+    'D3',
+    'D4',
+    'D5',
+    'D6',
+    'D7',
+    'D8',
+    'D2005', //2005
+    'D2006', //2006
+    '',
+    'D2009', //2009
+    '',
+    'D2010', //2010
+    'XE', //XE
+    'XE2', //XE2
+    'XE3', //XE3
+    'XE4', //XE4
+    'XE5', //XE5
+    'XE6', //XE6
+    'XE7', //XE7&AppMethod
+    'XE8', //XE8
+    '10Seattle', //10 Seattle
+    '10_1Berlin', //10.1 Berlin
+    '10_2Tokyo' //10.2 Tokyo
+  );
+begin
+  if Ver<verK1 then
+    Result := sVerName[Ver]
+  else
+    Result := Format('K%d',[Ver-verK1+1]);
+end ;
+
+function GetPlatformTag(IsMSIL: boolean; Platf: TDCUPlatform): String;
+const
+  platfSymbol: array[TDCUPlatform]of String = ('','64','X',
+    'iOSSim','iOSDev','iOSDev64','Android','Linux64');
+begin
+  if IsMSIL then
+    Result := 'N'
+  else
+    Result := platfSymbol[Platf];
+end ;
+
+function GetCfgLibDir(VerRq: integer; MSILRq: boolean; PlatformRq: TDCUPlatform): String;
+var
+  sKey,S: String;
+  KeyCh: Char;
+  IniF: TIniFile;
+begin
+  Result := '';
+  if LibConfigFN='' then
+    Exit;
+  if VerRq<0 then
+    Exit;
+  if not FileExists(LibConfigFN) then
+    Exit;
+  if PreferDebugLib then
+    KeyCh := 'D'
+  else
+    KeyCh := 'R';
+  sKey := GetVerTag(VerRq)+'_'+GetPlatformTag(MSILRq,PlatformRq)+KeyCh;
+  try
+    IniF := TIniFile.Create(LibConfigFN);
+    try
+      Result := IniF.ReadString('LIBS',sKey,'');
+      if Result='' then
+        Exit;
+      Result := ExtractFilePath(Result);
+      if ExtractFileDrive(Result)<>'' then
+        Exit;
+      S := IniF.ReadString('CFG','LIBROOT','');
+      if S<>'' then
+        S := S+DirSep
+      else
+        S := ExtractFilePath(LibConfigFN);
+      Result := S+Result;
+    finally
+      IniF.Free;
+    end ;
+  except
+    Result := '';
+  end ;
+end ;
+
 function GetDelphiLibDir(VerRq: integer; MSILRq: boolean; PlatformRq: TDCUPlatform): String;
 { Delphi LIB directory autodetection }
 {$IFDEF Win32}
 const
   sRoot = 'RootDir';
-  sPlatformDir: array[TDCUPlatform]of String = ('win32','win64','osx32','iOSSimulator','iOSDevice','Android');
+  sPlatformDir: array[TDCUPlatform]of String = ('win32','win64','osx32','iOSSimulator',
+    'iOSDevice','iOSDevice64','android','linux64');
 var
   Key: HKey;
   sPath,sRes,sLib: String;
   DataType, DataSize: Integer;
 {$ENDIF}
 begin
-  Result := '';
+  Result := GetCfgLibDir(VerRq,MSILRq,PlatformRq);
+  if Result<>'' then
+    Exit;
  {$IFDEF Win32}
   sPath := '';
   sLib := 'Lib';
@@ -130,9 +224,13 @@ begin
    //verAppMethod: sPath := 'SOFTWARE\Embarcadero\BDS\13.0'; == verD_XE7
    verD_XE6: sPath := 'SOFTWARE\Embarcadero\BDS\14.0';
    verD_XE7: sPath := 'SOFTWARE\Embarcadero\BDS\15.0';
-  end ;
-  if sPath='' then
+   verD_XE8: sPath := 'SOFTWARE\Embarcadero\BDS\16.0';
+   verD_10: sPath := 'SOFTWARE\Embarcadero\BDS\17.0';
+   verD_10_1: sPath := 'SOFTWARE\Embarcadero\BDS\18.0';
+   verD_10_2: sPath := 'SOFTWARE\Embarcadero\BDS\19.0';
+  else
     Exit;
+  end ;
   if RegOpenKeyEx(HKEY_CURRENT_USER, PChar(sPath), 0, KEY_READ, Key)<>ERROR_SUCCESS then
     if RegOpenKeyEx(HKEY_LOCAL_MACHINE, PChar(sPath), 0, KEY_READ, Key)<>ERROR_SUCCESS then
       Exit;
@@ -146,14 +244,21 @@ begin
     SetString(sRes, nil, (DataSize div SizeOf(Char)) - 1);
     if RegQueryValueEx(Key, sRoot, nil, @DataType, PByte(sRes), @DataSize) <> ERROR_SUCCESS then
       Exit;
-    if sRes[Length(sRes)]<>DirSep then
-      sRes := sRes+DirSep;
-    if VerRq>=verD_XE then
-      sLib := 'lib'+DirSep+sPlatformDir[PlatformRq]+DirSep+'release';
-    Result := sRes+sLib+DirSep;
   finally
     RegCloseKey(Key);
   end ;
+  if sRes[Length(sRes)]<>DirSep then
+    sRes := sRes+DirSep;
+  if (VerRq>=verD_XE)and(VerRq<verK1) then begin
+    sLib := 'lib'+DirSep+sPlatformDir[PlatformRq]+DirSep;
+    if PreferDebugLib then
+      sLib := sLib+'debug'
+    else
+      sLib := sLib+'release';
+   end
+  else if PreferDebugLib and(VerRq>verD4) then
+    sLib := sLib+DirSep+'debug';
+  Result := sRes+sLib+DirSep;
  {$ENDIF}
 end ;
 
@@ -417,9 +522,11 @@ begin
       FN := '';
     if FN='' then
       PathList.Delete(AutoLibDirNDX)
-    else
+    else begin
       PathList[AutoLibDirNDX] := FN;
-    AutoLibDirNDX := -1; //Substitution for * was made
+      Writeln('Using Delphi lib: ',FN);
+    end ;
+    AutoLibDirNDX := -1; //Substitution for * had been made
   end ;
   {if not AddedUnitDirToPath then begin
     AddUnitDirToPath(FName);
@@ -553,7 +660,7 @@ begin
   Result := FileSearch(FName,PASPath);
 end ;
 
-procedure LoadSourceLines(FName: String; Lines: TStrings);
+procedure LoadSourceLines(const FName: String; Lines: TStrings);
 var
   S: String;
 begin
