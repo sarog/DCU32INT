@@ -61,10 +61,12 @@ begin
   '    D(-) - show Data block'#13#10+
   '    d(-) - show dot types'#13#10+
   '    F(-) - show Fixups'#13#10+
+  '    H(+) - show Heuristic strings'#13#10+
   '    I(+) - show Imported names'#13#10+
   '    L(-) - show table of Local variables'#13#10+
   '    M(-) - don''t resolve class Methods'#13#10+
   '    O(-) - show file Offsets'#13#10+
+  '    S(-) - show Self arguments of methods and 2nd call flags of `structors'#13#10+
   '    T(-) - show Type table'#13#10+
   '    U(-) - show Units of imported names'#13#10+
   '    V(-) - show auxiliary Values'#13#10+
@@ -116,11 +118,13 @@ begin
                 'D': ShowDataBlock := true;
                 'd': ShowDotTypes := true;
                 'F': ShowFixupTbl := true;
+                'H': ShowHeuristicRefs := false;
                 'I': ShowImpNames := false;
-                'T': ShowTypeTbl := true;
                 'L': ShowLocVarTbl := true;
                 'M': ResolveMethods := false;
                 'O': ShowFileOffsets := true;
+                'S': ShowSelf := true;
+                'T': ShowTypeTbl := true;
                 'U': ShowImpNamesUnits := true;
                 'V': ShowAuxValues := true;
                 'v': ShowVMT := true;

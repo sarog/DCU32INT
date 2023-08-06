@@ -575,7 +575,7 @@ begin
      Fix := Nil;
      Fixed := false;
      if GetFixupFor(DP,SizeOf(integer),false,Fix)and(Fix<>Nil) then begin
-       Fixed := ReportFixup(Fix,D);
+       Fixed := ReportFixup(Fix,D,ShowHeuristicRefs);
      end ;
      if (D=0)and(Fix<>Nil) then
        Exit;

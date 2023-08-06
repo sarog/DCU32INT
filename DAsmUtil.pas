@@ -594,7 +594,7 @@ begin
    dsWord: Result := Word(DP^);
    dsDbl: Result := LongInt(DP^);
   End ;
-  Fixed := ReportFixUp(Fix,Result);
+  Fixed := ReportFixUp(Fix,Result,ShowHeuristicRefs);
   {
 //  if (ReportFixUp(Cardinal(DP)-Cardinal(CodeStart),hDSize and dsMask,DP)=0)
 //  then begin
@@ -659,7 +659,7 @@ begin
     PutS('+');
 //  if (ReportFixUp(Cardinal(DP)-Cardinal(CodeStart),hDSize and dsMask,DP)=0{<>0})
 //  then
-  Fixed := ReportFixUp(Fix,Result);
+  Fixed := ReportFixUp(Fix,Result,ShowHeuristicRefs);
   if Fixed then begin
     if (DS=dsDbl){and(Result=0)} then
       Exit;
@@ -754,7 +754,7 @@ begin
     dsDbl:  PutS('DWORD');
     dsPtr:  PutS('DWORD');
     dsQWord:PutS('QWORD');
-    dsTWord:PutS('TWORD');
+    dsTWord:PutS('TBYTE');
   else
     PutS('?');
   End ;

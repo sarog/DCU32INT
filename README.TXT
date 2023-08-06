@@ -1,5 +1,5 @@
 The DCU32INT utility by Alexei Hmelnov.
-Version 1.10.0
+Version 1.10.1
 
 ----------------------------------------------------------------------------
 E-Mail: alex@icc.ru
@@ -22,6 +22,15 @@ I have done my best to make it useful.
 
 Changes from the version 1.0.
 -----------------------------
+
+Version 1.10.1:
+
+1. Added displaying of possible inline string constants (use -SH 
+  to turn it off).
+2. The Self arguments of methods and 2nd call flags of constructors 
+  and destructors are hidden now. To show them as before use -SS option.
+3. Auxiliary fake procedures, which hold the values of huge string 
+  typed constants are marked now by the JustData flag and not disassembled.
 
 Version 1.10.0:
 
@@ -114,17 +123,19 @@ Destination file may contain * to be replaced by the unit name or name and
 extension. If * is the last char in the name, it will be replaced by 
 <Unit name>.int, else - by <Unit name>.
 Destination file = "-" => write to stdout.
-
+Flags (start with "/" or "-"):
  -S<show flag>* - Show flags (-S - show all), default: (+) - on, (-) - off
     A(-) - show Address table
     C(-) - don't resolve Constant values
     D(-) - show Data block
     d(-) - show dot types
     F(-) - show Fixups
+    H(+) - show Heuristic strings
     I(+) - show Imported names
     L(-) - show table of Local variables
     M(-) - don't resolve class Methods
     O(-) - show file Offsets
+    S(-) - show Self arguments of methods and 2nd call flags of `structors
     T(-) - show Type table
     U(-) - show Units of imported names
     V(-) - show auxiliary Values

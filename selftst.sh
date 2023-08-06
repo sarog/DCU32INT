@@ -1,8 +1,7 @@
 #!/bin/sh
-rm ./resSlf/*
-echo "Started">./resSlf/res
-for F in ./linux/*.dcu; do
-  ./dcu32int -U/home/alex/kylix/lib $F "./resSlf/*" |tee -a ./resSlf/res
+echo "Started">/home/alex/DCU32INT/resSlf/res
+for F in /home/alex/DCU32INT/*.dcu; do
+  /home/alex/DCU32INT/DCU32INT -U/home/alex/kylix/lib $F "/home/alex/DCU32INT/resSlf/*" |tee -a /home/alex/DCU32INT/resSlf/res
 done
-echo "Ended" >>./resSlf/res
+echo "Ended" >>/home/alex/DCU32INT/resSlf/res
 

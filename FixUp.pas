@@ -104,7 +104,7 @@ function GetFixupFor(CodePtr:PChar; Size: Cardinal; StartOk: boolean;
   var Fix: PFixupRec): boolean;
 
 function FixupOk(Fix: PFixupRec): boolean;
-function ReportFixup(Fix: PFixupRec; Ofs: LongInt): boolean;
+function ReportFixup(Fix: PFixupRec; Ofs: LongInt; UseHAl: boolean): boolean;
 
 implementation
 
@@ -288,11 +288,14 @@ begin
   Result := (Fix<>Nil)and(FixUnit<>Nil);
 end ;
 
-function ReportFixup(Fix: PFixupRec; Ofs: LongInt): boolean;
+function ReportFixup(Fix: PFixupRec; Ofs: LongInt; UseHAl: boolean): boolean;
 var
   U: TUnit;
   D: TDCURec;
   hDT: integer;
+  DP: Pointer;
+  Sz: Cardinal;
+  L: integer;
 begin
   Result := false;
   if (Fix=Nil)or(FixUnit=Nil) then
@@ -300,17 +303,31 @@ begin
   Inc(AuxLevel);
   PutSFmt('K%x ',[TByte4(Fix^.OfsF)[3]]);
   Dec(AuxLevel);
-  PutS(TUnit(FixUnit).GetAddrStr(Fix^.NDX,true{ShowNDX}));
-  {D := TUnit(FixUnit).GetAddrDef(Fix^.NDX);
-  PutS(GetDCURecStr(D,Fix^.NDX,true));}
  // if Ofs<>0 then begin
     D := TUnit(FixUnit).GetGlobalAddrDef(Fix^.NDX,U);
     hDT := -1;
+    L := -1;
     if D<>Nil then begin
       if D is TVarDecl then
-        hDT := TVarDecl(D).hDT;
+        hDT := TVarDecl(D).hDT
+      else if UseHAl and(Ofs>0{0 Ofs usually means just call})and(D is TProcDecl) then begin
+        DP := TUnit(FixUnit).GetBlockMem(TProcDecl(D).CodeOfs,TProcDecl(D).Sz,Sz);
+        if (DP<>Nil)and(Ofs<=Sz) then begin
+          if Ofs>=8 then
+            L := ShowStrConst(PChar(DP)+Ofs-8,Sz-Ofs+8);
+          if L<0 then
+            L := TryShowPCharConst(PChar(DP)+Ofs,Sz-Ofs);
+        end ;
+      end ;
     end ;
+    if L>0 then
+      PutS(' {');
+    PutS(TUnit(FixUnit).GetAddrStr(Fix^.NDX,true{ShowNDX}));
+    {D := TUnit(FixUnit).GetAddrDef(Fix^.NDX);
+    PutS(GetDCURecStr(D,Fix^.NDX,true));}
     PutS(U.GetOfsQualifier(hDT,Ofs));
+    if L>0 then
+      PutS('}');
  // end ;
   Result := true;
 end ;

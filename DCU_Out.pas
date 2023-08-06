@@ -46,7 +46,9 @@ var
   ResolveMethods: boolean=true;
   ResolveConsts: boolean=true;
   ShowDotTypes: boolean=false;
+  ShowSelf: boolean=false;
   ShowVMT: boolean=false;
+  ShowHeuristicRefs: boolean=true;
   ShowImpNamesUnits: boolean=false;
   DasmMode: TDasmMode = dasmSeq;
 
@@ -78,6 +80,8 @@ function CharStr(Ch: Char): String;
 function WCharStr(WCh: WideChar): String;
 function BoolStr(DP: Pointer; DS: Cardinal): String;
 function StrConstStr(CP: PChar; L: integer): String;
+function ShowStrConst(DP: Pointer; DS: Cardinal): integer {Size used};
+function TryShowPCharConst(DP: PChar; DS: Cardinal): integer {Size used};
 
 const
   cSoftNL=#0;
@@ -111,6 +115,7 @@ begin
   ResolveMethods := true;
   ResolveConsts := true;
   ShowDotTypes := true;
+  ShowSelf := true;
   ShowVMT := true;
   ShowImpNamesUnits := true;
 end ;
@@ -608,6 +613,50 @@ begin
     Result := ''''''
   else
     SetLength(Result,LRes);
+end ;
+
+function ShowStrConst(DP: Pointer; DS: Cardinal): integer {Size used};
+var
+  L: integer;
+  VP: Pointer;
+begin
+  Result := -1;
+  if DS<9 {Min size} then
+    Exit;
+  if integer(DP^)<>-1 then
+    Exit {Reference count,-1 => ~infinity};
+  VP := PChar(DP)+SizeOf(integer);
+  L := integer(VP^);
+  if DS<L+9 then
+    Exit;
+  Inc(PChar(VP),SizeOf(integer));
+  if (PChar(VP)+L)^<>#0 then
+    Exit;
+  Result := L+9;
+  PutS(StrConstStr(VP,L));
+end ;
+
+function TryShowPCharConst(DP: PChar; DS: Cardinal): integer {Size used};
+{ This function should check whether DP points to some valid text
+  I know that this algorithm is wrong for multibyte encoding.
+  Dear Asian colleagues, Please send me your versions. }
+const
+  ValidChars = [#9,#13,#10,' '..#255];
+var
+  CP,EP: PChar;
+begin
+  EP := DP+DS;
+  Result := -1;
+  CP := DP;
+  while (CP<EP)and(CP^in ValidChars) do
+    Inc(CP);
+  if (CP>=EP)or(CP^<>#0) then
+    Exit;
+  if (DP^=#$E9)and(CP=DP+1) then {JMP 0 - got tired of those wrong strings for TRY}
+    Exit;
+  Result := CP-DP;
+  PutS(StrConstStr(DP,Result));
+  Inc(Result);
 end ;
 
 end.

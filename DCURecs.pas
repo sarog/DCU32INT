@@ -325,6 +325,7 @@ TProcDecl = class(TNameFDecl{TProcDeclBase})
   MethodKind: TMethodKind; //may be this information is encoded by some flag, but
     //I can't detect it. May be it would be enough to analyse the structure of
     //the procedure name, but this way it will be safer.
+  JustData: boolean; //This flag is turned on by Fixups from String typed consts
   FProcLocVarTbl: PLocVarTbl;
   FProcLocVarCnt: integer;
   constructor Create(AnEmbedded: TNameDecl; NoInf: boolean);
@@ -486,7 +487,6 @@ TShortStrDef = class(TArrayDef)
 end ;
 
 TStringDef = class(TArrayDef)
-  function ShowStrConst(DP: Pointer; DS: Cardinal): integer {Size used};
   function ShowRefValue(Ndx: TNDX; Ofs: Cardinal): boolean;
   function ShowValue(DP: Pointer; DS: Cardinal): integer {Size used}; override;
   procedure Show; override;
@@ -602,7 +602,7 @@ end ;
 end ;}
 
 const
-  NoName: ShortString='?';
+  NoName: String[1]='?';
 
 const
 {Register, where register variable is located,
@@ -2052,6 +2052,7 @@ procedure TProcDecl.ShowArgs;
 var
   NoName: boolean;
   Ofs0: Cardinal;
+  ArgL: TNameDecl;
 begin
   NoName := IsUnnamed;
   Inc(AuxLevel);
@@ -2064,12 +2065,22 @@ begin
   Dec(AuxLevel);
   Ofs0 := NLOfs;
   Inc(NLOfs,2);
-  if Args<>Nil then
+  ArgL := Args;
+  if (not ShowSelf)and(MethodKind<>mkProc) then begin
+    if (ArgL<>Nil)and(ArgL.Name^='Self') then begin
+      ArgL := TNameDecl(ArgL.Next);
+      if (ArgL<>Nil)and(MethodKind<>mkMethod){Constructor or Destructor - skip the 2nd call flag}
+        and(ArgL.Name^='.')
+      then
+        ArgL := TNameDecl(ArgL.Next);
+    end ;
+  end ;
+  if ArgL<>Nil then
     PutS(cSoftNL+'(');
-  CurUnit.ShowDeclList(dlArgs,Args,Ofs0,2,[{dsComma,}dsNoFirst,dsSoftNL],
+  CurUnit.ShowDeclList(dlArgs,ArgL,Ofs0,2,[{dsComma,}dsNoFirst,dsSoftNL],
     ProcSecKinds,skNone);
   NLOfs := Ofs0+2;
-  if Args<>Nil then
+  if ArgL<>Nil then
     PutS(')');
   if not IsProc then begin
     PutS(':'+cSoftNL);
@@ -2263,7 +2274,13 @@ begin
     PutS('begin');
     NLOfs := Ofs0+2;
     GetRegVarInfo := GetRegDebugInfo;
-    CurUnit.ShowCodeBl(AddrBase,CodeOfs,Sz);
+    if not JustData then
+      CurUnit.ShowCodeBl(AddrBase,CodeOfs,Sz)
+    else begin
+      NL;
+      PutS('data ');
+      CurUnit.ShowDataBl(AddrBase,CodeOfs,Sz);
+    end ;
     GetRegVarInfo := Nil;
     NLOfs := Ofs0;
     NL;
@@ -2749,7 +2766,7 @@ begin
       PutS(cSoftNL+'{');
     end ;
     PutS('@');
-    if not ReportFixup(Fix,Cardinal(V)) then
+    if not ReportFixup(Fix,Cardinal(V),false{not VOk} {UseHAl}) then
      if V<>Nil then
        PutSFmt('+$%x',[Cardinal(V)]);
     if VOk then begin
@@ -3072,32 +3089,12 @@ begin
 end ;
 
 { TStringDef. }
-function TStringDef.ShowStrConst(DP: Pointer; DS: Cardinal): integer {Size used};
-var
-  L: integer;
-  VP: Pointer;
-begin
-  Result := -1;
-  if DS<9 {Min size} then
-    Exit;
-  if integer(DP^)<>-1 then
-    Exit {Reference count,-1 => ~infinity};
-  VP := PChar(DP)+SizeOf(integer);
-  L := integer(VP^);
-  if DS<L+9 then
-    Exit;
-  Inc(PChar(VP),SizeOf(integer));
-  if (PChar(VP)+L)^<>#0 then
-    Exit;
-  Result := L+9;
-  PutS(StrConstStr(VP,L));
-end ;
-
 function TStringDef.ShowRefValue(Ndx: TNDX; Ofs: Cardinal): boolean;
 var
   U: TUnit;
   DT: TTypeDef;
   AR: TDCURec;
+  Proc: TProcDecl absolute AR;
   DP: PChar;
   Sz: Cardinal;
   EP: PChar;
@@ -3110,9 +3107,11 @@ begin
   AR := TUnit(FixUnit).GetGlobalAddrDef(Ndx,U);
   if (AR=Nil)or not(AR is TProcDecl) then
     Exit;
-  DP := TUnit(FixUnit).GetBlockMem(TProcDecl(AR).CodeOfs,TProcDecl(AR).Sz,Sz);
+  DP := TUnit(FixUnit).GetBlockMem(Proc.CodeOfs,Proc.Sz,Sz);
   if Ofs>=Sz then
     Exit;
+  if Proc.IsUnnamed then
+    Proc.JustData := true; //Mark the procedure as having no code
   L := ShowStrConst(DP+Ofs-8,Sz-Ofs+8);
   Result := L>0;
 end ;

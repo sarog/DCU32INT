@@ -1054,7 +1054,7 @@ begin
     SetCodeRange(DP,DP,DS);
   end ;
   if IsConst and (T is TStringDef) then
-    Result := TStringDef(T).ShowStrConst(DP,DS)
+    Result := ShowStrConst(DP,DS)
   else
     Result := T.ShowValue(DP,DS);
   if IsConst then

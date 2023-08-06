@@ -8,7 +8,7 @@ F=0
 G=1
 H=1
 I=1
-J=0
+J=1
 K=0
 L=1
 M=0
@@ -28,6 +28,7 @@ Z=1
 ShowHints=1
 ShowWarnings=1
 UnitAliases=WinTypes=Windows;WinProcs=Windows;DbiTypes=BDE;DbiProcs=BDE;DbiErrs=BDE;
+
 [Linker]
 MapFile=0
 OutputObjs=0
@@ -37,6 +38,7 @@ MinStackSize=16384
 MaxStackSize=1048576
 ImageBase=4194304
 ExeDescription=
+
 [Directories]
 OutputDir=
 UnitOutputDir=..\dcu
@@ -45,16 +47,18 @@ Packages=IBEVNT30;VCLDB30;VCL30;VCLX30;INETDB30;INET30;VCLDBX30;VCLSMP30;QRPT30;
 Conditionals=
 DebugSourceDirs=
 UsePackages=0
+
 [Parameters]
-RunParams="-UD:\Program Files\Borland\Delphi7\Lib\" D:\DATA\DCU\Ex\3\1\DrIntf.dcu d:\data\int\* -AC -RWinTypes=Windows;WinProcs=Windows;DbiTypes=BDE;DbiProcs=BDE;DbiErrs=BDE;
+RunParams=-S H:\PRG\DCU32PAS\MAIL\MMorbitzer\System.dcu
 HostApplication=
+
 [Version Info]
 IncludeVerInfo=1
 AutoIncBuild=1
 MajorVer=1
-MinorVer=10
+MinorVer=6
 Release=0
-Build=2
+Build=12
 Debug=0
 PreRelease=0
 Special=0
@@ -62,14 +66,15 @@ Private=0
 DLL=0
 Locale=1049
 CodePage=1251
+
 [Version Info Keys]
 CompanyName=AX
-FileDescription=Parser of Delphi 2.0-8.0, 2005(.net and WIN32), 2006(WIN32 only), Kylix 1.0-3.0
-FileVersion=1.10.0.2
+FileDescription=Parser of Delphi 2.0 - 6.0, Kylix 1.0 units
+FileVersion=1.6.0.12
 InternalName=DCU32INT
-LegalCopyright=Copyright ©2000-2006, Alexei E. Hmelnov
+LegalCopyright=Copyright ©2000,2001, Alexei E. Hmelnov
 LegalTrademarks=
 OriginalFilename=DCU32INT
 ProductName=DCU32INT
-ProductVersion=1.10.0
+ProductVersion=1.6.3
 Comments=
