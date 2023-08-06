@@ -29,12 +29,15 @@ interface
 uses
   DasmDefs,DasmUtil;
 
-procedure Set80x86Disassembler;
+procedure Set80x86Disassembler{$IFDEF I64}(I64: Boolean){$ENDIF};
 
 implementation
 
-procedure Set80x86Disassembler;
+procedure Set80x86Disassembler{$IFDEF I64}(I64: Boolean){$ENDIF};
 begin
+ {$IFDEF I64}
+  modeI64 := I64;
+ {$ENDIF}
   SetDisassembler(ReadCommand, ShowCommand,CheckCommandRefs);
 end ;
 

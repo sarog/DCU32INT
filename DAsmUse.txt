@@ -1,4 +1,5 @@
 DCU32INT Disassembler Usage.
+----------------------------
 
 The only place, where the disassembler is used in the current version 
 of the program is the
@@ -42,7 +43,7 @@ The fixup information is stored in the table of 8-byte records
 (see the unit FixUp)
 
 TFixupRec = record
-  OfsF: integer;{Low 3 bytes - ofs, high 1 byte - B1}
+  OfsF: integer;{Low 3 bytes - ofs, high 1 byte - F}
   Ndx: TNDX; {The index of the target address}
 end ;
 
@@ -65,9 +66,22 @@ The F byte in the OfsF field can take the following values:
   fxStart20 = 3; //Start of block marker in Delhi 2.0 units
   fxEnd20 = 4;  //End of of block marker in Delhi 2.0 units
   fxStart30 = 5; //Start of block marker in Delhi 3.0+ units
-  fxEnd30 = 6; //End of block marker in Delhi 3.0+ units
+  fxEnd30 = 6; //End of block marker in Delhi 3.0-6.0 and Kylix units
+  fxStart70 = 6; //Start of block marker in Delhi 7.0, 2005 (WIN32) units
+  fxEnd70 = 7; //End of block marker in Delhi 7.0, 2005 (WIN32) units
 
-The typed constants 
+  fxStartMSIL = $0B; //Start of block marker in Delhi 8.0, 2005 .net units
+  fxEndMSIL = $0C; //End of block marker in Delhi 8.0, 2005 .net units
+
+  fxStart100 = $0C; //Start of block marker in Delhi 2006 (WIN32) units
+  fxEnd100 = $0D; //End of block marker in Delhi 2006 (WIN32) units
+
+Note that some intermediate fixup codes were not observed and their
+purposes are unknown. Please inform me (mailto:alex@icc.ru) if You'll
+notice some new fixup.
+
+
+The variables 
 
   fxStart: Byte;
   fxEnd: Byte;
@@ -147,10 +161,55 @@ the following two cases:
  CP2: PChar = @TestProc; 
 
 where TestProc is declared only in implementation. So, not everything 
-is so simple.
+is so simple. 
 
 The possible way to detect all the real procedures could be:
   1. Start with all the real procedures (which are named). 
     The entry point of all the procedures is at their block start.
   2. Follow the references and disassemble only those procedures, 
     which are called by some other procedures.
+
+
+Control flow analysis.
+----------------------
+
+Now the DCU32INT implements a basic control flow analysis. It is 
+turned on by the -AC switch and implemented in the TUnit.DasmCodeBlCtlFlow
+method. The resulting code parts are stored in the data structures
+defined in the unit DasmCF. I hope that in the future the control flow 
+information will be further analysed, e.g. to detect the high-level
+operators like loops, ifs, cases and so on.
+
+
+Generic disassemblers.
+----------------------
+
+Since Delphi 8.0 the *.dcuil files contain not the i80x86 opcodes, but 
+the MSIL opcodes (of .net). To support the capability of using different 
+disassemblers for different unit versions the DCU32INT disassembly code
+was modified. Now it uses generic disassemblers, which are specified
+in the DasmDefs unit. 
+
+A concrete disassembler is turned on by calling the SetDisassembler procedure.
+The program now implements the following disassemblers:
+
+- i80x86: use DasmX86, call Set80x86Disassembler to turn on;
+- MSIL (.net): use DasmMSIL, call SetMSILDisassembler to turn on.
+
+So, new code kinds are welcome now.
+
+A generic disassembler is characterised by the following three functions:
+
+1) ReadCommand - reads the command at CodePtr, 
+  modifies the global variables CodePtr, PrevCodePtr: PrevCodePtr points 
+  to the command start, CodePtr points to the command end. ReadCommand
+  returns false if the memory doesn`t contain a valid code.
+2) ShowCommand - prints the text of the command just parsed by ReadCommand;
+3) CheckCommandRefs - detects the references to the other commands
+  from the command just parsed by ReadCommand, e.g. destinations of
+  conditional branches.
+
+---------------------------------------------------------------------------
+DCU32INT home page: http://hmelnov.icc.ru/DCU/
+
+Alexei E. Hmelnov (mailto:alex@icc.ru)
