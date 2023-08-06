@@ -32,11 +32,13 @@ uses
 
 type
 
+TCmdClass = class of TCmd;
+
 TCmd = class
 protected
   FOfs: Cardinal;
 public
-  constructor Create(AOfs: integer);
+  constructor Create(AOfs: integer); virtual;
   property Ofs: Cardinal read FOfs;
 end ;
 
@@ -113,11 +115,13 @@ protected
   FCommands: TList;
   FNext: PCmdSeqRef;
   FNextCond: PCmdSeqRef;
-  FLevel,FState: Integer;
+  FLevel: Integer; //DFS visit order
+  FState: Integer{0 - unprocessed, 1 - in processing (on the DFS stack), 2 - processed};
   FRefs: PCmdSeqRef; //References to the sequence
   FLabels: TCmdSeqLabel;
   FIDom: array[Boolean{IsPost}]of TCmdSeq; //Immediate dominator
   function GetCount: Integer;
+  class function GetCmdClass: TCmdClass; virtual;
 public
   constructor Create(AStart: integer); virtual;
   destructor Destroy; override;
@@ -156,7 +160,6 @@ public
   property Size: Cardinal read FSize;
   property Kind: TProcMemKind read FKind;
 end ;
-
 
 TProc = class(TList)
 protected
@@ -307,7 +310,6 @@ begin
 end ;
 
 { TCmdSeq. }
-
 constructor TCmdSeq.Create(AStart: integer);
 begin
   inherited Create(AStart);
@@ -325,6 +327,7 @@ begin
       TCmd(FCommands[i]).Free;
     FCommands.Destroy;
   end ;
+  inherited Destroy;
 end ;
 
 function TCmdSeq.GetCount: Integer;
@@ -422,9 +425,14 @@ begin
   FSize := Cmd.Ofs+ASize-FStart;
 end ;
 
+class function TCmdSeq.GetCmdClass: TCmdClass;
+begin
+  Result := TCmd;
+end ;
+
 function TCmdSeq.NewCmd(AStart,ASize: Cardinal): TCmd;
 begin
-  Result := TCmd.Create(AStart);
+  Result := GetCmdClass.Create(AStart);
   AddCmd(Result,ASize);
 end ;
 
@@ -736,7 +744,7 @@ end ;
 const
   SeqUnknown = TCmdSeq(-1);
 
-function DomMerge(D1,D2: TCmdSeq; IsPost: Boolean): TCmdSeq;
+function FindCommonDominator(D1,D2: TCmdSeq; IsPost: Boolean): TCmdSeq;
 var
   D: Integer;
 begin
@@ -754,7 +762,7 @@ begin
       Exit{Paranoic: for predecessors - unreachable lines};
     end ;
     D := D1.FLevel-D2.FLevel;
-    if D=0 then begin
+    if D=0 then begin //The Level is unique among the nodes => D1=D2
       Result := D1;
       Exit;
     end ;
@@ -780,15 +788,15 @@ begin
       if IsPost then begin
         Ref := Seq.FNext;
         if Ref<>Nil then
-          IDomRes := DomMerge(IDomRes,Ref^.Tgt,IsPost);
+          IDomRes := FindCommonDominator(IDomRes,Ref^.Tgt,IsPost);
         Ref := Seq.FNextCond;
         if Ref<>Nil then
-          IDomRes := DomMerge(IDomRes,Ref^.Tgt,IsPost);
+          IDomRes := FindCommonDominator(IDomRes,Ref^.Tgt,IsPost);
        end
       else begin
         Ref := Seq.FRefs;
         while Ref<>Nil do begin
-          IDomRes := DomMerge(IDomRes,Ref^.Src,IsPost);
+          IDomRes := FindCommonDominator(IDomRes,Ref^.Src,IsPost);
           Ref := Ref^.NextSrc;
         end ;
       end ;

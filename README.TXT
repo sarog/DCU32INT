@@ -1,5 +1,5 @@
 The DCU32INT utility by Alexei Hmelnov.
-Version 1.25.1
+Version 1.26.1
 
 ----------------------------------------------------------------------------
 E-Mail: alex@icc.ru
@@ -19,6 +19,8 @@ XE8, 10 Seattle, 10.1 Berlin (WIN32,WIN64,OSX32,iOS simulator,
   iOS device 32/64 (no code),Android (no code)), 
 10.2 Tokyo (WIN32,WIN64,OSX32,iOS simulator, 
   iOS device 32/64 (no code),Android (no code),Linux (no code)), 
+10.3 Rio (WIN32,WIN64,OSX32,iOS simulator, 
+  iOS device 32/64 (no code),Android (no code),Linux (may be - not checked,no code)), 
 Kylix 1.0-3.0 units (DCU) 
 and convert their information into the close to 
 Pascal form.
@@ -34,6 +36,15 @@ I have done my best to make it useful.
 
 Changes from the version 1.0.
 -----------------------------
+
+Version 1.26.1:
+
+1. The units of Delphi 10.3 Rio are supported now, the Linux platform support 
+  was not checked, because the Community Edition was used. 
+2. The complete check of inline code support has shown some specification
+  errors, the errors were fixed.
+3. The XML-based disassembler can display information about instruction 
+  arguments, when the flag -ADX is turned on in the command line.
 
 Version 1.25.1:
 

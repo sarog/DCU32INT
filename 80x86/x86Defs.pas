@@ -231,6 +231,7 @@ type
   TOpcodeArgAttr = (aa_address,aa_depend,aa_displayed,aa_group,aa_nr,aa_type);
 
   TArgFlag = (afDst,afNoDepend,afNoDispl,afNone,afNr);
+  TArgFlagBit = afDst..afNoDispl;
   TArgFlags = set of TArgFlag;
 
   {TArgAddrMethod = (am_None,

@@ -64,7 +64,7 @@ const
   iopLetSet = diop0+$24; //set of ..., Variant
   iopLetStr = diop0+$25;
   iopLetIntf = diop0+$26;
- //%$IF Mobile and(Ver<=verD_XE7;
+ //%$IF Mobile and(Ver<verD_XE7;
   iopLetCast0 = diop0+$27;
  //%$END
   //iop?;
@@ -258,13 +258,14 @@ const
   iopCvtIntfToCl = diop5+$D7;
   iopCvtTToClass = diop5+$D8;
   iopCvtAuxIntfToClass = diop5+$D9;
-// %$IF Mobile and(Ver>=verD_XE8);
+// %$IF Mobile and(Ver>=verD_XE7);
   iopLetCast = $E7-($20-$19);
   biop6 = iopLetCast;
 // %$END
 // %$IF Ver>=verD_XE8;
   iopLetCvtPtr = $EA-($20-$19);
   iopCvtConst = $EB-($20-$19);
+  iopInlineFCall = $EC-($20-$19);
 // %$END
 
 type
@@ -652,6 +653,15 @@ TInlineForInOperator = class(TInlineOperator)
   FhCond: TInlineOpNDX;
   FhBody: TInlineOpNDX;
   FhStep: TInlineOpNDX;
+ public
+  constructor Load(const Parms: TInlineNodeLoadParms); override;
+  procedure Show(Info: TInlineDeclModifier; ParentId,Id: Integer; Role: TInlineNodeRole); override;
+end ;
+
+TInlineInlineFCall = class(TInlineOperator)
+ protected
+  FhOp: TInlineOpNDX; //Operator to execute before expressions
+  FhVal: TInlineOpNDX; //the expression (condition) itself
  public
   constructor Load(const Parms: TInlineNodeLoadParms); override;
   procedure Show(Info: TInlineDeclModifier; ParentId,Id: Integer; Role: TInlineNodeRole); override;
@@ -1652,6 +1662,28 @@ begin
   PutKW('end');
 end ;
 
+{ TInlineInlineFCallOperator. }
+constructor TInlineInlineFCall.Load(const Parms: TInlineNodeLoadParms);
+begin
+  inherited Load(Parms);
+  FhOp := ReadUIndex;
+  FhVal := ReadUIndex;
+end ;
+
+procedure TInlineInlineFCall.Show(Info: TInlineDeclModifier; ParentId,Id: Integer; Role: TInlineNodeRole);
+{var
+  Line0: Integer;}
+begin
+  inherited Show(Info,ParentId,Id,Role);
+  PutKWSp('inline {call}');
+  Info.ShowInlineOp(FhOp,Id,irBlock,[isfIndent,isfNL{,isfBeginEnd}]{ShowFlags});
+    //!!!It makes the resulting Pascal code wrong, but it is better to analyze the code and replace it manually by the corresponding function call
+  NL;
+  PutKWSp('end {inline}');
+  Info.ShowInlineOp(FhVal,Id,irArgument,[isfIndent]{ShowFlags});
+end ;
+
+
 { TInlineTryFinallyOperator. }
 constructor TInlineTryFinallyOperator.Load(const Parms: TInlineNodeLoadParms);
 begin
@@ -2572,7 +2604,7 @@ begin
       Dec(Tag,$20-$19);
   end ;
   if (Tag>=biop1)and(Tag<biop6) then begin
-    if (CurUnit.Ver<=verD_XE7)and(CurUnit.Platform in MobilePlatforms) then begin
+    if (CurUnit.Ver<verD_XE7)and(CurUnit.Platform in MobilePlatforms) then begin
       if Tag=iopLetCast0 then begin
         Tag := iopLetCast;
         goto TagOk;
@@ -2666,6 +2698,8 @@ begin
    iopForIn: Result := TInlineForInOperator.Load(Parms);
 
    iopCond: Result := TInlineOneArgOperator.Load(Parms);
+   iopInlineFCall: if CurUnit.Ver>=verD_10_3 then
+     Result := TInlineInlineFCall.Load(Parms);
    iopSetLabel: Result := TInlineSetLabelOperator.Load(Parms);
    iopGoTo: Result := TInlineGoToOperator.Load(Parms);
 

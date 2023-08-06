@@ -41,6 +41,7 @@ uses
   FixUp in 'FixUp.pas',
   DCURecs in 'DCURecs.pas',
   DasmDefs in 'DasmDefs.pas',
+  DasmUtil in 'DasmUtil.pas',
  {$IFDEF XMLx86}
   x86Reg in '80x86\x86Reg.pas',
   x86Defs in '80x86\x86Defs.pas',
@@ -69,6 +70,7 @@ begin
   ' -S<show flag>* - Show flags (-S - show all), default: (+) - on, (-) - off'#13#10+
   '    A(-) - show Address table'#13#10+
   '    C(-) - don''t resolve Constant values'#13#10+
+  '    c(-) - don''t fix comment chars'#13#10+
   '    D(-) - show Data block'#13#10+
   '    d(-) - show dot types'#13#10+
   '    F(-) - show Fixups'#13#10+
@@ -98,10 +100,11 @@ begin
   ' -Q<Query flag> - Query additional information.'#13#10+
   '    F(-) - class fields'#13#10+
   '    V(-) - class virtual methods'#13#10+
-  ' -A<Mode> - disAssembler mode'#13#10+
+  ' -A<Mode>[<eXtra>] - disAssembler mode'#13#10+
   '    S(+) - simple Sequential (all memory is a sequence of ops)'#13#10+
   '    C(-) - Control flow'#13#10+
-  '    D(-) - control and Data flow'#13#10
+  '    D(-) - control and Data flow'#13#10+
+  '    <eXtra>=X => Show x86 command eXtra information'#13#10
   );
 end ;
 
@@ -122,7 +125,7 @@ var
 
 function ProcessParms: boolean;
 var
-  i,j: integer;
+  i,j,L: integer;
   PS: String;
   Ch: Char;
 begin
@@ -145,6 +148,7 @@ begin
               case Ch of
                 'A': ShowAddrTbl := true;
                 'C': ResolveConsts := false;
+                'c': FixCommentChars := false;
                 'D': ShowDataBlock := true;
                 'd': ShowDotTypes := true;
                 'F': ShowFixupTbl := true;
@@ -229,7 +233,8 @@ begin
           DotNamePrefix := PS;
         end ;
         'A': begin
-           if Length(PS)=2 then
+           L := Length(PS);
+           if L=2 then
              Ch := 'C'
            else
              Ch := UpCase(PS[3]);
@@ -240,6 +245,11 @@ begin
            else
              Writeln('Unknown disassembler mode: "',Ch,'"');
              Exit;
+           end ;
+           if L>3 then begin
+             Ch := UpCase(PS[4]);
+             if Ch='X' then
+               ShowX86DasmExtraInfo := true;
            end ;
         end ;
         'F': begin

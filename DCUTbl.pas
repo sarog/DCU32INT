@@ -128,7 +128,8 @@ const
     'XE8', //XE8
     '10Seattle', //10 Seattle
     '10_1Berlin', //10.1 Berlin
-    '10_2Tokyo' //10.2 Tokyo
+    '10_2Tokyo', //10.2 Tokyo
+    '10_3Rio' //10.3 Rio
   );
 begin
   if Ver<verK1 then
@@ -228,6 +229,7 @@ begin
    verD_10: sPath := 'SOFTWARE\Embarcadero\BDS\17.0';
    verD_10_1: sPath := 'SOFTWARE\Embarcadero\BDS\18.0';
    verD_10_2: sPath := 'SOFTWARE\Embarcadero\BDS\19.0';
+   verD_10_3: sPath := 'SOFTWARE\Embarcadero\BDS\20.0';
   else
     Exit;
   end ;
@@ -296,7 +298,7 @@ end ;
 procedure FindPackagesAndAddToPathList(const Mask: String);
 var
   SR: TSearchRec;
-  Path,FN,Ext: String;
+  Path,Ext: String;
   lExt: Integer;
 begin
   Ext := ExtractFileExt(Mask);

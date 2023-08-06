@@ -215,6 +215,9 @@ var
 var
   AdrIs32Deft: boolean = true;
   OpIs32Deft: boolean = true;
+ //{$IFDEF XMLx86}
+  ShowX86DasmExtraInfo: Boolean = false;
+ //{$ENDIF}
 
 {$IFDEF I64}
 const
@@ -1108,7 +1111,6 @@ begin
   S := GetEnumName(TypeInfo(TOpcodeMnem),Ord(Mnem));
   System.Delete(S,1,3);
   PutKW(S);
-  PutS(' ');
 end ;
 
 procedure ShowCmdPrefixes(PP: TIncPtr; UsedPfx: Integer);
@@ -1127,27 +1129,168 @@ begin
     Inc(PP);
     if (UsedPfx and 1=0)and(B<>$0F) then begin
       Mnem := GetPrefixMnemonics(EP,B);
-      if Mnem<>oc_None then
+      if Mnem<>oc_None then begin
         WriteMnem(Mnem);
+        PutSpace;
+      end ;
     end ;
     UsedPfx := UsedPfx shr 1;
   end ;
 end ;
 
-function WriteCmdName(const Cmd: TCmdInfo): POpcodeArgs;
+function WriteCmdName(const Cmd: TCmdInfo; var Entry: POpcodeEntry): POpcodeArgs;
 var
   EP: POpcodeEntry;
   SP: POpcodeSyntax;
 begin
   with OpTables[Cmd.hCmd.hEntry and efTwoByte<>0] do begin
     EP := @Entries^[Cmd.hCmd.hEntry and efEntryIndex];
-    if (EP^.Count<=0)or(Cmd.hCmd.hSyntax<0) then
+    if (EP^.Count<=0)or(Cmd.hCmd.hSyntax<0) then begin
+      Entry := Nil;
+      Result := Nil;
       Exit{Paranoic};
+    end ;
     SP := @Syntaxes[EP^.Base+Cmd.hCmd.hSyntax];
     WriteMnem(SP^.Mnem);
     Result := @Args^[SP^.Base];
+    Entry := EP;
   end ;
 //  PutKW(GetOpName(hN));
+end ;
+
+function ProcFlagsToStr(Flags: TProcessorFlags): String;
+var
+  F: TProcessorFlag0;
+begin
+  Result := '';
+  for F := Low(TProcessorFlag) to High(TProcessorFlag) do begin
+    if F in Flags then
+      Result := Result+FlagChars[F];
+  end ;
+end ;
+
+type
+  TExtraInfo = object
+    HasInfo: Boolean;
+    procedure Init;
+    procedure Open0;
+    procedure Open;
+    procedure Close;
+  end ;
+
+procedure TExtraInfo.Init;
+begin
+  HasInfo := false;
+end ;
+
+procedure TExtraInfo.Open0;
+begin
+  if HasInfo then
+    Exit;
+  HasInfo := true;
+  RemOpen;
+end ;
+
+procedure TExtraInfo.Open;
+begin
+  if HasInfo then
+    PutSpace
+  else
+    Open0;
+end ;
+
+procedure TExtraInfo.Close;
+begin
+  if not HasInfo then
+    Exit;
+  HasInfo := false;
+  RemClose;
+end ;
+
+procedure ShowCmdExtraInfo(Entry: POpcodeEntry);
+var
+  ExtraInfo: TExtraInfo;
+
+  procedure ShowGrInfo(EnumTI: PTypeInfo; V: Integer);
+  var
+    S: String;
+  begin
+    if V=0{g?_none} then
+      Exit;
+    ExtraInfo.Open;
+    S := GetEnumName(EnumTI,V);
+    System.Delete(S,1,3);
+    PutS(S);
+  end ;
+
+  procedure ShowProcFlags(const Prefix: String; Flags: TProcessorFlags);
+  begin
+    if Flags=[] then
+      Exit;
+    ExtraInfo.Open;
+    PutS(Prefix);
+    PutS(ProcFlagsToStr(Flags));
+  end ;
+
+  procedure ShowCoProcFlags(const Prefix: String; Flags: TCoprocessorFlags);
+  var
+    i: Integer;
+  begin
+    if Flags=0 then
+      Exit;
+    ExtraInfo.Open;
+    PutS(Prefix);
+    for i:=0 to 3 do
+     if (1 shl i)and Flags<>0 then
+       PutCh(Chr(Ord('1')+i));
+  end ;
+
+
+begin
+  ExtraInfo.Init;
+  ShowGrInfo(TypeInfo(TEntryIExt),Ord(Entry^.iExt));
+  ShowGrInfo(TypeInfo(TEntryGrp1),Ord(Entry^.grp1));
+  ShowGrInfo(TypeInfo(TEntryGrp2),Ord(Entry^.grp2));
+  ShowGrInfo(TypeInfo(TEntryGrp3),Ord(Entry^.grp3));
+  ShowProcFlags('test:',Entry^.TestF);
+  ShowProcFlags('def:',Entry^.DefF);
+  ShowProcFlags('0=',Entry^.Vals0F);
+  ShowProcFlags('1=',Entry^.Vals1F);
+  //ShowProcFlags('modif:',Entry^.ModifF); in fact ModifF=DefF+UndefF
+  ShowProcFlags('undef:',Entry^.UndefF);
+  ShowCoProcFlags('def:',Entry^.CDefF);
+  ShowCoProcFlags('0=',Entry^.CVals0F);
+  ShowCoProcFlags('undef:',Entry^.CUndefF);
+  ExtraInfo.Close;
+end ;
+
+procedure ShowArgExtraInfo(const Arg: TOpcodeArg);
+const
+  ArgFlagName: array[TArgFlagBit]of String = ('<-','~','*');
+var
+  Flags: TArgFlags;
+  F: TArgFlagBit;
+  ExtraInfo: TExtraInfo;
+begin
+  if Arg.Flags*[Low(TArgFlagBit)..High(TArgFlagBit)]=[] then
+    Exit;
+  ExtraInfo.Init;
+  Flags := Arg.Flags;
+  if afDst in Flags then begin
+    ExtraInfo.Open0;
+    if afNoDepend in Flags then begin
+      Exclude(Flags,afNoDepend);
+      PutS('<-');
+     end
+    else
+      PutS('<=');
+  end ;
+  for F := Succ(Low(TArgFlagBit)) to High(TArgFlagBit) do
+    if F in Flags then begin
+      ExtraInfo.Open0;
+      PutS(ArgFlagName[F]);
+    end ;
+  ExtraInfo.Close;
 end ;
 {$ENDIF}
 
@@ -1157,6 +1300,7 @@ var
   OpName: String[10];
   SeprChar: AnsiChar;
  {$IFDEF XMLx86}
+  Entry: POpcodeEntry;
   Args: POpcodeArgs;
  {$ENDIF}
 begin
@@ -1188,7 +1332,10 @@ begin
   SeprChar := ',';
   if Cmd.PrefSize>0 then
     ShowCmdPrefixes(PrevCodePtr,Cmd.hCmd.FPrefix);
-  Args := WriteCmdName(Cmd);
+  Args := WriteCmdName(Cmd,Entry);
+  if ShowX86DasmExtraInfo then
+    ShowCmdExtraInfo(Entry);
+  PutSpace;
  {$ENDIF}
   for i:=1 to Cmd.Cnt do begin
     if i>1 then begin
@@ -1196,6 +1343,10 @@ begin
       SeprChar := ',';
     end ;
     WriteArg(Cmd.Arg[i],{$IFNDEF XMLx86}i=1{$ELSE}afDst in Args^[Cmd.Arg[i].nArg].Flags{$ENDIF}{IsFirst});
+   {$IFDEF XMLx86}
+    if ShowX86DasmExtraInfo then
+      ShowArgExtraInfo(Args^[Cmd.Arg[i].nArg]);
+   {$ENDIF}
   end ;
 end ;
 

@@ -76,10 +76,11 @@ const {My own (AX) codes for Delphi/Kylix versions, the Delphi codes
   verD_10=23; //10 Seattle
   verD_10_1=24; //10.1 Berlin
   verD_10_2=25; //10.2 Tokyo
+  verD_10_3=26; //10.2 Tokyo
   verK1=100; //Kylix 1.0
   verK2=101; //Kylix 2.0
   verK3=102; //Kylix 3.0
-  MaxDelphiVer = 25;
+  MaxDelphiVer = 26;
 
 type
   TDCUPlatform = (dcuplWin32,dcuplWin64,dcuplOsx32,dcuplIOSEmulator,
@@ -371,7 +372,7 @@ protected
   procedure ReadUnitHeader;
   procedure ReadSourceFiles;
   procedure ShowSourceFiles;
-  function ShowUses(PfxS: AnsiString; FRq: TUnitImpFlags): boolean;
+  function ShowUses(const PfxS: AnsiString; FRq: TUnitImpFlags): boolean;
   procedure ReadUses(TagRq: TDCURecTag);
   function ReadUnitAddInfo: TUnitAddInfo;
   procedure SetListDefName(L: TList; hDef,hDecl: integer; Name: PName);
@@ -385,7 +386,7 @@ protected
   procedure SetExportNames(Decl: TDCURec{TNameDecl});
   procedure SetEnumConsts(var Decl: TDCURec{TNameDecl});
   function GetExportDecl(const Name: String; Stamp: integer): TNameFDecl;
-  function GetExportType(const Name: String; Stamp: integer): TTypeDef;
+  function GetExportType(const Name: String; Stamp: integer): TBaseDef{TTypeDef};
 {-------------------------}
   procedure LoadFixups;
   procedure LoadCodeLines;
@@ -485,10 +486,11 @@ public
   function IsValidMemPtr(DP: Pointer): Boolean;
   function HasFixups: Boolean;
   function GetFixupsFor(DP: Pointer; DS: ULong; var Fix: PFixupRec): Integer{FixCnt};
+  procedure GetAllUses(SL: TStrings; FRq: TUnitImpFlags);
   property UnitName: AnsiString read FUnitName;
   property FileName: String read FFName;
   property ExportDecls[const Name: String; Stamp: integer]: TNameFDecl read GetExportDecl;
-  property ExportTypes[const Name: String; Stamp: integer]: TTypeDef read GetExportType;
+  property ExportTypes[const Name: String; Stamp: integer]: TBaseDef{TTypeDef it may be TImpTypeDefRec for type <T>} read GetExportType;
   property Ver: integer read FVer;
   property IsMSIL: boolean read FIsMSIL;
   property Platform: TDCUPlatform read FPlatform;
@@ -665,7 +667,7 @@ const
   verStrDelphi: array[0..MaxDelphiVer]of String = (
     'Error','Error 1','2','3','4','5','6','7','8','2005','2006','?2007','2009',
     'Error 13','2010','XE','XE2','XE3','XE4','XE5','XE6','XE7','XE8','10 Seattle',
-    '10.1 Berlin','10.2 Tokyo');
+    '10.1 Berlin','10.2 Tokyo','10.3 Rio');
   platfStr: array[TDCUPlatform]of String = ('Win32','Win64','Osx32',
     'iOSEmulator','iOSDevice','iOSDevice64','Android','Linux64');
 begin
@@ -797,7 +799,7 @@ begin
   NL;
 end ;
 
-function TUnit.ShowUses(PfxS: AnsiString; FRq: TUnitImpFlags): boolean;
+function TUnit.ShowUses(const PfxS: AnsiString; FRq: TUnitImpFlags): boolean;
 var
   i,Cnt,hImp: integer;
   U: PUnitImpRec;
@@ -859,6 +861,26 @@ begin
   Result := Cnt>0;
   if Result then
     PutCh(';');
+end ;
+
+procedure TUnit.GetAllUses(SL: TStrings; FRq: TUnitImpFlags);
+var
+  i: integer;
+  U: PUnitImpRec;
+  Decl: TBaseDef;
+begin
+  if FUnitImp.Count=0 then
+    Exit;
+  for i:=0 to FUnitImp.Count-1 do begin
+    U := FUnitImp[i];
+    if FRq<>U.Flags then
+      Continue;
+    Decl := U^.Decls;
+    while Decl<>Nil do begin
+      SL.AddObject(Decl.Name^.GetStr,Decl);
+      Decl := Decl.Next as TBaseDef;
+    end ;
+  end ;
 end ;
 
 procedure TUnit.ReadUses(TagRq: TDCURecTag);
@@ -1684,7 +1706,7 @@ begin
       it`s wrong, cause hides some names}
     then begin
 //    if not FExportNames.Find(Decl.Name^,NDX) then
-      FExportNames.AddObject(Decl.Name^.GetStr,Decl);
+      FExportNames.AddObject(TNameFDecl(Decl).GetExpName{Name - we should export the original unmodified name}^.GetStr,Decl);
     end ;
     Decl := Decl.Next {as TNameDecl};
   end ;
@@ -1812,7 +1834,7 @@ begin
   until false;
 end ;
 
-function TUnit.GetExportType(const Name: String; Stamp: integer): TTypeDef;
+function TUnit.GetExportType(const Name: String; Stamp: integer): TBaseDef{TTypeDef};
 var
   ND: TNameDecl;
 begin
@@ -1820,7 +1842,7 @@ begin
   ND := ExportDecls[Name,Stamp];
   if (ND=Nil)or not(ND is TTypeDecl) then
     Exit;
-  Result := GetLocalTypeDef(TTypeDecl(ND).hDef);
+  Result := GetTypeDef{GetLocalTypeDef}(TTypeDecl(ND).hDef);
 end ;
 
 procedure TUnit.LoadFixups;
@@ -1940,10 +1962,13 @@ end ;
 procedure TUnit.LoadStrucScope;
 {In fact just skip them by now}
 var
-  Cnt,i: integer;
+  Cnt,i,N: integer;
 begin
   Cnt := ReadUIndex;
-  for i:=1 to Cnt*5 do
+  N := 5;
+  if (Ver>=verD_10_3)and(Ver<verK1) then
+    Inc(N); //Some field was added
+  for i:=1 to Cnt*N do
     ReadUIndex; {(hType,hVar,Ofs,LnStart,LnCnt}
 end ;
 
@@ -4285,7 +4310,7 @@ begin
      //which we describe here:
       BVer := Magic shr 24;
       PlMagic := Magic and $FF;
-      if (BVer<=$20{10_2Tokyo})and(BVer>=$1B{XE6})and(PlMagic=$4D)or
+      if (BVer<=$21{10_3Rio})and(BVer>=$1B{XE6})and(PlMagic=$4D)or
          (BVer<=$1A{XE5})and(BVer>=$17{XE2})and(PlMagic=$4B)
       then begin
         PlMagic := (Magic shr 8)and $FF;
@@ -4326,7 +4351,7 @@ begin
          end;
         $21: begin
           if (FVer<verD_10_2) then
-            Exit{Android support was added in XE4};
+            Exit{Linux support was added in XE 10.2};
           FPlatform := dcuplLinux64;
           //The drCBlock section is missing here, all the memory is in the corresponding
           //*.o file. Or inline info decoding is required
@@ -4540,10 +4565,10 @@ begin
       //if Tag<>drStop then
       //  DCUError({'Unexpected '+}'stop tag');
     finally
+      SetExportNames(FDecls); //Moved before BindEmbeddedTypes, because some embedded types (like TList<T>.TEnumerator) should be exported
       if (Ver>=verD_XE)and(Ver<verK1) then
        //try to fix the local types relocation problem of XE
         BindEmbeddedTypes;
-      SetExportNames(FDecls);
       SetEnumConsts(FDecls);
       FillProcLocVarTbls;
      // Show;

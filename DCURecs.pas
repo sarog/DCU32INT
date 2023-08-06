@@ -283,6 +283,7 @@ TNameDecl = class(TDCURec)
   procedure ShowName; override;
   procedure Show; override;
   procedure ShowDef(All: boolean); override;
+  function GetExpName: PName;
   function GetName: PName; override;
   function SetMem(MOfs,MSz: Cardinal): Cardinal {Rest}; override;
   {function GetSecKind: TDeclSecKind; override;}
@@ -1685,12 +1686,17 @@ begin
   end ;
 end ;
 
-function TNameDecl.GetName: PName;
+function TNameDecl.GetExpName: PName;
 begin
   if Def=Nil then
     Result := @NoName
   else
     Result := @Def^.Name;
+end ;
+
+function TNameDecl.GetName: PName;
+begin
+  Result := GetExpName;
 end ;
 
 function TNameDecl.SetMem(MOfs,MSz: Cardinal): Cardinal {Rest};
@@ -2411,7 +2417,7 @@ begin
     LocFlagsX := LocFlags; //To simplify the rest of the code
   LocFlagsX := LocFlagsX and not lfauxPropField; //just in case - it should be 0 anyway
   if (CurUnit.Ver>=verD2009)and(CurUnit.Ver<verK1) then
-    ReadUIndex;
+    ReadUIndex; //B3
   if (CurUnit.Ver>=verD_XE4)and(CurUnit.Ver<verK1)and
     (LK in [dlArgs,dlArgsT])and(LocFlags and $40<>0)
   then //was observed after the [REF] decorator
@@ -2634,7 +2640,8 @@ begin
     if CurUnit.IsMSIL and(NDX<>0) then begin
       ReadByteIfEQ(1);//I was unable to find something less perverse to skip this byte
     end ;
-    if (CurUnit.Ver>=verD2009)and(CurUnit.Ver<verK1)and(GetTag<>arMethod{=arConstr,arDestr}) then
+    if (CurUnit.Ver>=verD2009)and(CurUnit.Ver<verK1)and not Name^.IsEmpty//and(GetTag<>arMethod{=arConstr,arDestr})
+    then
       ReadByte;
     if (CurUnit.Ver>=verD7)and(CurUnit.Ver<verK1)or(Name^.IsEmpty)
     then begin

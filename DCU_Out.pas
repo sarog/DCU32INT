@@ -51,6 +51,7 @@ var
   ShowAuxValues: boolean=false;
   ResolveMethods: boolean=true;
   ResolveConsts: boolean=true;
+  FixCommentChars: boolean=true;
   ShowDotTypes: boolean=false;
   ShowSelf: boolean=false;
   ShowVMT: boolean=false;
@@ -263,6 +264,7 @@ begin
   ShowAuxValues := true;
   ResolveMethods := true;
   ResolveConsts := true;
+  FixCommentChars := false;
   ShowDotTypes := true;
   ShowSelf := true;
   ShowVMT := true;
@@ -511,11 +513,17 @@ begin
     Dec(Len);
     if ch<' ' then begin
       if FNLOfs>MaxNLOfs then
-        Ch := AnsiChar(MaxNLOfs)
+        ch := AnsiChar(MaxNLOfs)
       else
-        Ch := AnsiChar(FNLOfs);
+        ch := AnsiChar(FNLOfs);
+     end 
+    else if (RemLevel>0)and FixCommentChars then begin
+      if ch='{' then
+        ch := '('
+      else if ch='}' then
+        ch := ')';
     end ;
-    Buf[BufLen] := Ch;
+    Buf[BufLen] := ch;
     Inc(BufLen);
     if ch<' ' then
       FlushSoftNL(0);
